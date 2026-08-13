@@ -54,6 +54,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -63,6 +64,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -126,6 +128,7 @@ private val sections = listOf(
 @Composable
 private fun SvarshikProApp() {
     var selectedSection by remember { mutableIntStateOf(0) }
+    var selectedGost by remember { mutableStateOf<DocumentItem?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -133,21 +136,35 @@ private fun SvarshikProApp() {
         containerColor = AppBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            AppHeader(
-                section = sections[selectedSection],
-                onAction = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
-            )
+            if (selectedGost == null) {
+                AppHeader(
+                    section = sections[selectedSection],
+                    onAction = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
+                )
+            }
         },
         bottomBar = {
-            AppNavigation(
-                selected = selectedSection,
-                onSelected = { selectedSection = it },
-            )
+            if (selectedGost == null) {
+                AppNavigation(
+                    selected = selectedSection,
+                    onSelected = { selectedSection = it },
+                )
+            }
         },
     ) { padding ->
+        selectedGost?.let { document ->
+            OfflinePdfReaderScreen(
+                padding = padding,
+                code = document.code,
+                title = document.title,
+                assetName = document.assetName,
+                onBack = { selectedGost = null },
+            )
+            return@Scaffold
+        }
         when (selectedSection) {
             0 -> AnalysisScreen(padding, snackbarHostState)
-            1 -> GostScreen(padding)
+            1 -> GostScreen(padding, onDocumentSelected = { selectedGost = it })
             2 -> LibraryScreen(padding)
             3 -> CoursesScreen(padding)
             4 -> TrainersScreen(padding)
@@ -437,53 +454,101 @@ private fun DetectionCard(
     }
 }
 
-private data class DocumentItem(
+internal data class DocumentItem(
     val code: String,
     val title: String,
     val meta: String,
     val tag: String,
+    val assetName: String,
 )
 
 @Composable
-private fun GostScreen(padding: PaddingValues) {
+private fun GostScreen(
+    padding: PaddingValues,
+    onDocumentSelected: (DocumentItem) -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
     val documents = listOf(
-        DocumentItem("ГОСТ 5264—80", "Ручная дуговая сварка. Соединения сварные", "Действующий · 33 страницы", "РДС"),
-        DocumentItem("ГОСТ 14771—76", "Дуговая сварка в защитном газе", "Действующий · 42 страницы", "MIG/MAG"),
-        DocumentItem("ГОСТ 8713—79", "Сварка под флюсом. Основные типы соединений", "Действующий · 38 страниц", "SAW"),
-        DocumentItem("ГОСТ ISO 9606-1—2020", "Аттестационные испытания сварщиков", "Действующий · 49 страниц", "Аттестация"),
-        DocumentItem("ГОСТ 3242—79", "Соединения сварные. Методы контроля качества", "Действующий · 18 страниц", "Контроль"),
+        DocumentItem("ГОСТ EN 1011-6—2017", "Сварка. Рекомендации по сварке металлических материалов. Часть 6. Лазерная сварка", "Офлайн · 39 страниц", "Лазер", "gost-en-1011-6-2017.pdf"),
+        DocumentItem("ГОСТ 2246—70", "Проволока стальная сварочная. Технические условия", "Офлайн · 19 страниц", "Материалы", "gost-2246-70.pdf"),
+        DocumentItem("ГОСТ 2601—84", "Сварка металлов. Термины и определения основных понятий", "Офлайн · 57 страниц", "Термины", "gost-2601-84.pdf"),
+        DocumentItem("ГОСТ 5264—80", "Ручная дуговая сварка. Соединения сварные. Основные типы, конструктивные элементы и размеры", "Офлайн · 35 страниц", "РДС", "gost-5264-80.pdf"),
+        DocumentItem("ГОСТ 8713—79", "Сварка под флюсом. Соединения сварные. Основные типы, конструктивные элементы и размеры", "Офлайн · 42 страницы", "SAW", "gost-8713-79.pdf"),
+        DocumentItem("ГОСТ 10594—80", "Оборудование для дуговой, контактной, ультразвуковой сварки и плазменной обработки. Ряды параметров", "Офлайн · 3 страницы", "Оборудование", "gost-10594-80.pdf"),
+        DocumentItem("ГОСТ 11533—75", "Автоматическая и полуавтоматическая дуговая сварка под флюсом. Соединения под углами", "Офлайн · 39 страниц", "SAW", "gost-11533-75.pdf"),
+        DocumentItem("ГОСТ 11534—75", "Ручная дуговая сварка. Соединения сварные под острыми и тупыми углами", "Офлайн · 23 страницы", "РДС", "gost-11534-75.pdf"),
+        DocumentItem("ГОСТ 11969—79", "Сварка плавлением. Основные положения и их обозначения", "Офлайн · 6 страниц", "Основы", "gost-11969-79.pdf"),
+        DocumentItem("ГОСТ 14771—76", "Дуговая сварка в защитном газе. Соединения сварные", "Офлайн · 9 страниц", "MIG/MAG", "gost-14771-76.pdf"),
+        DocumentItem("ГОСТ 14776—79", "Дуговая сварка. Соединения сварные точечные", "Офлайн · 12 страниц", "Дуговая", "gost-14776-79.pdf"),
+        DocumentItem("ГОСТ 14806—80", "Дуговая сварка алюминия и алюминиевых сплавов в инертных газах", "Офлайн · 37 страниц", "TIG", "gost-14806-80.pdf"),
+        DocumentItem("ГОСТ 15164—78", "Электрошлаковая сварка. Соединения сварные", "Офлайн · 19 страниц", "ЭШС", "gost-15164-78.pdf"),
+        DocumentItem("ГОСТ 15878—79", "Контактная сварка. Соединения сварные. Конструктивные элементы и размеры", "Офлайн · 11 страниц", "Контактная", "gost-15878-79.pdf"),
+        DocumentItem("ГОСТ 16037—80", "Соединения сварные стальных трубопроводов", "Офлайн · 24 страницы", "Трубы", "gost-16037-80.pdf"),
+        DocumentItem("ГОСТ 16038—80", "Дуговая сварка трубопроводов из меди и медно-никелевого сплава", "Офлайн · 22 страницы", "Медь", "gost-16038-80.pdf"),
+        DocumentItem("ГОСТ 19521—74", "Сварка металлов. Классификация", "Офлайн · 14 страниц", "Основы", "gost-19521-74.pdf"),
+        DocumentItem("ГОСТ 20549—75", "Диффузионная сварка в вакууме рабочих элементов штампов", "Офлайн · 8 страниц", "Диффузионная", "gost-20549-75.pdf"),
+        DocumentItem("ГОСТ 23055—78", "Контроль неразрушающий. Классификация сварных соединений по радиографическому контролю", "Офлайн · 8 страниц", "Контроль", "gost-23055-78.pdf"),
+        DocumentItem("ГОСТ 23338—91", "Методы определения содержания диффузионного водорода в наплавленном металле и металле шва", "Офлайн · 21 страница", "Контроль", "gost-23338-91.pdf"),
+        DocumentItem("ГОСТ 23518—79", "Дуговая сварка в защитных газах. Соединения под острыми и тупыми углами", "Офлайн · 28 страниц", "MIG/MAG", "gost-23518-79.pdf"),
+        DocumentItem("ГОСТ 25997—83", "Сварка металлов плавлением. Статистическая оценка качества", "Офлайн · 18 страниц", "Контроль", "gost-25997-83.pdf"),
+        DocumentItem("ГОСТ 27580—88", "Дуговая сварка алюминия и алюминиевых сплавов. Соединения под углами", "Офлайн · 38 страниц", "TIG", "gost-27580-88.pdf"),
+        DocumentItem("ГОСТ 28915—91", "Сварка лазерная импульсная. Соединения сварные точечные", "Офлайн · 10 страниц", "Лазер", "gost-28915-91.pdf"),
+        DocumentItem("ГОСТ 30430—96", "Сварка дуговая конструкционных чугунов. Требования к технологическому процессу", "Офлайн · 15 страниц", "Чугун", "gost-30430-96.pdf"),
+        DocumentItem("ГОСТ 30482—97", "Сварка сталей электрошлаковая. Требования к технологическому процессу", "Офлайн · 19 страниц", "ЭШС", "gost-30482-97.pdf"),
+        DocumentItem("ГОСТ 33857—2016", "Арматура трубопроводная. Сварка и контроль качества сварных соединений", "Офлайн · 88 страниц", "Трубы", "gost-33857-2016.pdf"),
+        DocumentItem("ГОСТ 34061—2017", "Определение содержания водорода в наплавленном металле и металле шва", "Офлайн · 36 страниц", "Водород", "gost-34061-2017-iso3690.pdf"),
     )
+    val filteredDocuments = documents.filter {
+        query.isBlank() ||
+            it.code.contains(query, ignoreCase = true) ||
+            it.title.contains(query, ignoreCase = true) ||
+            it.tag.contains(query, ignoreCase = true)
+    }
     ContentList(
         padding = padding,
         title = "Нормативные документы",
-        subtitle = "ГОСТы, стандарты и справочные материалы",
+        subtitle = "28 документов доступны без интернета",
         searchHint = "Найти по номеру или названию",
+        searchValue = query,
+        onSearchValueChange = { query = it },
     ) {
         item {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("Все", "Ручная сварка", "Полуавтомат", "Контроль", "Аттестация")) {
+                items(listOf("Все", "РДС", "MIG/MAG", "TIG", "Контроль", "Трубы")) {
                     FilterChipLabel(it, selected = it == "Все")
                 }
             }
         }
-        items(documents) { document ->
-            DocumentCard(document)
+        items(filteredDocuments) { document ->
+            DocumentCard(document, onClick = { onDocumentSelected(document) })
+        }
+        if (filteredDocuments.isEmpty()) {
+            item {
+                Text(
+                    "По запросу «$query» ничего не найдено",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 30.dp),
+                    textAlign = TextAlign.Center,
+                    color = TextSecondary,
+                )
+            }
         }
         item {
             InfoBanner(
-                "Правовой статус",
-                "Перед применением документа проверяйте актуальность редакции в официальном фонде стандартов.",
+                "Источник и актуальность",
+                "Документы загружены с awelding.ru. Перед применением проверяйте редакцию и статус в официальном фонде стандартов.",
             )
         }
     }
 }
 
 @Composable
-private fun DocumentCard(document: DocumentItem) {
+private fun DocumentCard(document: DocumentItem, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { },
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
@@ -903,6 +968,8 @@ private fun ContentList(
     title: String,
     subtitle: String,
     searchHint: String,
+    searchValue: String? = null,
+    onSearchValueChange: ((String) -> Unit)? = null,
     content: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
 ) {
     LazyColumn(
@@ -918,20 +985,38 @@ private fun ContentList(
             Text(subtitle, color = TextSecondary, fontSize = 14.sp)
         }
         item {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                color = Color.White,
-                shape = RoundedCornerShape(15.dp),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 15.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+            if (searchValue != null && onSearchValueChange != null) {
+                OutlinedTextField(
+                    value = searchValue,
+                    onValueChange = onSearchValueChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(searchHint, fontSize = 13.sp) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Outlined.Search,
+                            contentDescription = null,
+                            tint = TextSecondary,
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(15.dp),
+                )
+            } else {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    color = Color.White,
+                    shape = RoundedCornerShape(15.dp),
                 ) {
-                    Icon(Icons.Outlined.Search, null, tint = TextSecondary, modifier = Modifier.size(21.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(searchHint, color = TextSecondary, fontSize = 13.sp)
+                    Row(
+                        modifier = Modifier.padding(horizontal = 15.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Outlined.Search, null, tint = TextSecondary, modifier = Modifier.size(21.dp))
+                        Spacer(Modifier.width(10.dp))
+                        Text(searchHint, color = TextSecondary, fontSize = 13.sp)
+                    }
                 }
             }
         }
