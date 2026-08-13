@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CameraAlt
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PlayCircleOutline
@@ -115,7 +115,7 @@ private data class AppSection(
 private val sections = listOf(
     AppSection("Анализ дефектов", "Анализ", Icons.Outlined.AutoAwesome),
     AppSection("ГОСТы", "ГОСТы", Icons.Outlined.Description),
-    AppSection("Библиотека", "Книги", Icons.Outlined.MenuBook),
+    AppSection("Библиотека", "Книги", Icons.AutoMirrored.Outlined.MenuBook),
     AppSection("Курсы", "Курсы", Icons.Outlined.School),
     AppSection("Тренажёры", "Практика", Icons.Outlined.Psychology),
     AppSection("Мессенджер", "Чаты", Icons.Outlined.ChatBubbleOutline),
@@ -574,7 +574,7 @@ private fun BookCard(book: BookItem) {
                     .background(book.color),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.MenuBook, null, tint = Color.White.copy(alpha = 0.85f))
+                Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = Color.White.copy(alpha = 0.85f))
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
