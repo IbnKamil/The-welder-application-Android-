@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Business
 import androidx.compose.material.icons.outlined.CameraAlt
@@ -74,12 +75,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val Navy = Color(0xFF101922)
 private val DarkNavy = Color(0xFF0A1118)
@@ -129,6 +133,8 @@ private val sections = listOf(
 private fun SvarshikProApp() {
     var selectedSection by remember { mutableIntStateOf(0) }
     var selectedGost by remember { mutableStateOf<DocumentItem?>(null) }
+    var selectedBook by remember { mutableStateOf<UserBook?>(null) }
+    val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -136,7 +142,7 @@ private fun SvarshikProApp() {
         containerColor = AppBackground,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            if (selectedGost == null) {
+            if (selectedGost == null && selectedBook == null) {
                 AppHeader(
                     section = sections[selectedSection],
                     onAction = { message -> scope.launch { snackbarHostState.showSnackbar(message) } },
@@ -144,7 +150,7 @@ private fun SvarshikProApp() {
             }
         },
         bottomBar = {
-            if (selectedGost == null) {
+            if (selectedGost == null && selectedBook == null) {
                 AppNavigation(
                     selected = selectedSection,
                     onSelected = { selectedSection = it },
@@ -162,10 +168,23 @@ private fun SvarshikProApp() {
             )
             return@Scaffold
         }
+        selectedBook?.let { book ->
+            UserBookReaderScreen(
+                padding = padding,
+                book = book,
+                onBack = { selectedBook = null },
+                onBookmark = { position ->
+                    BookRepository.saveBookmark(context, book.id, position)?.let {
+                        selectedBook = it
+                    }
+                },
+            )
+            return@Scaffold
+        }
         when (selectedSection) {
             0 -> AnalysisScreen(padding, snackbarHostState)
             1 -> GostScreen(padding, onDocumentSelected = { selectedGost = it })
-            2 -> LibraryScreen(padding)
+            2 -> LibraryScreen(padding, onBookSelected = { selectedBook = it })
             3 -> CoursesScreen(padding)
             4 -> TrainersScreen(padding)
             5 -> ComingSoonScreen(
@@ -590,44 +609,162 @@ private fun DocumentCard(document: DocumentItem, onClick: () -> Unit) {
     }
 }
 
-private data class BookItem(
-    val title: String,
-    val author: String,
-    val category: String,
-    val color: Color,
-)
-
 @Composable
-private fun LibraryScreen(padding: PaddingValues) {
-    val books = listOf(
-        BookItem("Технология электрической сварки металлов", "Б. Е. Патон", "Фундаментальная литература", Color(0xFF345B78)),
-        BookItem("Сварка и свариваемые материалы", "В. М. Ямпольский", "Учебное пособие", Color(0xFF774B39)),
-        BookItem("Контроль качества сварных соединений", "В. Н. Волченко", "Дефектоскопия", Color(0xFF46664B)),
-        BookItem("Справочник сварщика", "Под ред. В. В. Степанова", "Практический справочник", Color(0xFF5A506F)),
-    )
+private fun LibraryScreen(
+    padding: PaddingValues,
+    onBookSelected: (UserBook) -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var books by remember { mutableStateOf(BookRepository.loadBooks(context)) }
+    var query by remember { mutableStateOf("") }
+    var importError by remember { mutableStateOf<String?>(null) }
+    val filePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                importError = null
+                runCatching {
+                    withContext(Dispatchers.IO) {
+                        BookRepository.importBook(context, uri)
+                    }
+                }.onSuccess {
+                    books = BookRepository.loadBooks(context)
+                }.onFailure {
+                    importError = it.localizedMessage ?: "Не удалось добавить книгу"
+                }
+            }
+        }
+    }
+    val filteredBooks = books.filter {
+        query.isBlank() ||
+            it.title.contains(query, ignoreCase = true) ||
+            it.format.contains(query, ignoreCase = true)
+    }
+
     ContentList(
-        padding,
-        "Профессиональная библиотека",
-        "Учебники, справочники и работы экспертов",
-        "Автор, название или тема",
+        padding = padding,
+        title = "Моя библиотека",
+        subtitle = "Книги хранятся на устройстве и доступны без интернета",
+        searchHint = "Найти книгу",
+        searchValue = query,
+        onSearchValueChange = { query = it },
     ) {
         item {
-            FeaturedCard(
-                eyebrow = "ВЫБОР РЕДАКЦИИ",
-                title = "Основы сварочного производства",
-                subtitle = "Системный курс: от металлургии до контроля качества",
-                button = "Начать чтение",
+            Button(
+                onClick = {
+                    filePicker.launch(
+                        arrayOf(
+                            "application/pdf",
+                            "application/epub+zip",
+                            "text/plain",
+                        ),
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                shape = RoundedCornerShape(15.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Orange),
+            ) {
+                Icon(Icons.Outlined.Add, contentDescription = null)
+                Spacer(Modifier.width(9.dp))
+                Text("Добавить книгу", fontWeight = FontWeight.ExtraBold)
+            }
+        }
+        item {
+            Text(
+                "Поддерживаемые форматы: PDF, EPUB и TXT",
+                color = TextSecondary,
+                fontSize = 11.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
             )
         }
-        item { SectionTitle("Популярные книги", "Смотреть все") }
-        items(books) { book -> BookCard(book) }
+        importError?.let { message ->
+            item {
+                InfoBanner(
+                    title = "Книга не добавлена",
+                    text = message,
+                )
+            }
+        }
+        if (books.isEmpty()) {
+            item { EmptyLibraryCard() }
+        } else {
+            item { SectionTitle("Добавленные книги", "${books.size}") }
+            items(filteredBooks, key = { it.id }) { book ->
+                UserBookCard(book, onClick = { onBookSelected(book) })
+            }
+            if (filteredBooks.isEmpty()) {
+                item {
+                    Text(
+                        "По запросу «$query» ничего не найдено",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 28.dp),
+                        textAlign = TextAlign.Center,
+                        color = TextSecondary,
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun BookCard(book: BookItem) {
+private fun EmptyLibraryCard() {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 30.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(70.dp)
+                    .clip(CircleShape)
+                    .background(OrangeSoft),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Outlined.MenuBook,
+                    contentDescription = null,
+                    tint = Orange,
+                    modifier = Modifier.size(32.dp),
+                )
+            }
+            Spacer(Modifier.height(15.dp))
+            Text(
+                "Здесь появятся ваши книги",
+                color = TextPrimary,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 17.sp,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Нажмите «Добавить книгу» и выберите файл на устройстве",
+                color = TextSecondary,
+                fontSize = 12.sp,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserBookCard(book: UserBook, onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
     ) {
@@ -636,18 +773,33 @@ private fun BookCard(book: BookItem) {
                 modifier = Modifier
                     .size(width = 64.dp, height = 84.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(book.color),
+                    .background(
+                        when (book.format) {
+                            "pdf" -> Color(0xFF8B3E32)
+                            "epub" -> Color(0xFF345B78)
+                            else -> Color(0xFF46664B)
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.AutoMirrored.Outlined.MenuBook, null, tint = Color.White.copy(alpha = 0.85f))
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(book.category.uppercase(), color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(book.format.uppercase(), color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(5.dp))
                 Text(book.title, fontWeight = FontWeight.Bold, color = TextPrimary, lineHeight = 19.sp)
                 Spacer(Modifier.height(6.dp))
-                Text(book.author, color = TextSecondary, fontSize = 12.sp)
+                Text(
+                    if (book.bookmark > 0) {
+                        if (book.format == "pdf") "Закладка: страница ${book.bookmark + 1}"
+                        else "Есть сохранённая закладка"
+                    } else {
+                        "Нажмите, чтобы читать"
+                    },
+                    color = TextSecondary,
+                    fontSize = 12.sp,
+                )
             }
             Icon(Icons.Outlined.PlayCircleOutline, "Открыть", tint = TextSecondary)
         }
