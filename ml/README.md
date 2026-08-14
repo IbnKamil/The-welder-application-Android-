@@ -57,7 +57,9 @@ teacher и оценки качества снимка. Это проверяем
 В Google Colab сначала включите GPU, затем:
 
 ```bash
-git clone <URL-этого-репозитория>
+git clone \
+  --branch cursor/welder-pro-app-33b3 \
+  https://github.com/IbnKamil/The-welder-application-Android-.git
 cd The-welder-application-Android-/ml
 pip install -e ".[dev,export]"
 ```
