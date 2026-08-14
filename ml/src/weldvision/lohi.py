@@ -62,10 +62,19 @@ def prepare_lohi(
         name: {
             "images": len(rows),
             "groups": sorted({row["group_id"] for row in rows}),
+            "annotation_counts": _annotation_counts(
+                [row["image_path"] for row in rows]
+            ),
         }
         for name, rows in grouped_splits.items()
     }
-    report["official_fold_sizes"] = {name: len(paths) for name, paths in official.items()}
+    report["official_folds"] = {
+        name: {
+            "images": len(paths),
+            "annotation_counts": _annotation_counts(paths),
+        }
+        for name, paths in official.items()
+    }
     report_path = manifests / "lohi_audit.json"
     report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     return report
@@ -230,6 +239,25 @@ def _write_group_csv(path: Path, rows: list[dict[str, Any]]) -> None:
         )
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _annotation_counts(images: list[Path]) -> dict[str, int]:
+    counts: Counter[str] = Counter()
+    for image in images:
+        candidates = [
+            image.with_suffix(".yolo"),
+            image.with_suffix(".txt"),
+            Path(str(image).replace("/images/", "/labels/")).with_suffix(".txt"),
+            Path(str(image).replace("/images/", "/labels/")).with_suffix(".yolo"),
+        ]
+        label = next((candidate for candidate in candidates if candidate.is_file()), None)
+        if label is None:
+            raise FileNotFoundError(f"No annotation file for {image}")
+        class_counts = _validate_yolo(label)
+        counts.update(
+            {LOHI_CLASSES[class_id]: count for class_id, count in class_counts.items()}
+        )
+    return dict(counts)
 
 
 def _sha256(path: Path) -> str:
