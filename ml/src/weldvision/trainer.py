@@ -19,6 +19,7 @@ from weldvision.data import (
     detection_collate,
     unlabeled_collate,
 )
+from weldvision.metrics import detection_calibration_pairs
 from weldvision.model import (
     create_ema_teacher,
     create_mobile_detector,
@@ -26,7 +27,8 @@ from weldvision.model import (
     update_ema_teacher,
 )
 from weldvision.pseudo import ScoreTemperature, select_pseudo_targets
-from weldvision.quality import quality_scores
+from weldvision.quality import QualityGate, quality_scores
+from weldvision.quality_training import load_quality_gate
 
 
 def seed_everything(seed: int) -> None:
@@ -77,6 +79,7 @@ def adapt_epoch(
     quality_strength: float,
     unsupervised_weight: float,
     ema_decay: float,
+    quality_gate: QualityGate | None = None,
 ) -> dict[str, float]:
     student.train()
     teacher.eval()
@@ -96,7 +99,7 @@ def adapt_epoch(
 
         with torch.no_grad():
             predictions = teacher(weak_images)
-            quality = quality_scores(weak_images)
+            quality = quality_scores(weak_images, quality_gate)
             pseudo_targets, stats = select_pseudo_targets(
                 predictions,
                 quality,
@@ -183,6 +186,7 @@ def run_training(
     calibrator = ScoreTemperature(
         float(config.raw.get("calibration", {}).get("initial_temperature", 1.0))
     )
+    quality_gate = _optional_quality_gate(config, device)
     log_path = output_dir / "metrics.jsonl"
 
     if start_phase == "source":
@@ -192,6 +196,8 @@ def run_training(
             _write_metrics(log_path, "source", epoch, metrics)
             _save_checkpoint(output_dir, "source", epoch, student, teacher, optimizer, config)
         start_epoch = 0
+
+    _fit_teacher_calibration(config, teacher, calibrator, device)
 
     for epoch in range(start_epoch, config.training.adaptation_epochs):
         metrics = adapt_epoch(
@@ -206,6 +212,7 @@ def run_training(
             quality_strength=config.training.quality_threshold_strength,
             unsupervised_weight=config.training.unsupervised_weight,
             ema_decay=config.training.ema_decay,
+            quality_gate=quality_gate,
         )
         _write_metrics(log_path, "adaptation", epoch, metrics)
         _save_checkpoint(output_dir, "adaptation", epoch, student, teacher, optimizer, config)
@@ -254,3 +261,55 @@ def _write_metrics(path: Path, phase: str, epoch: int, metrics: dict[str, Any]) 
 def _repeat(loader: Iterable[Any]) -> Iterable[Any]:
     while True:
         yield from loader
+
+
+def _fit_teacher_calibration(
+    config: ExperimentConfig,
+    teacher: nn.Module,
+    calibrator: ScoreTemperature,
+    device: torch.device,
+) -> None:
+    manifest = config.data.target_val
+    if not manifest.is_file() or not manifest.read_text(encoding="utf-8").strip():
+        return
+    dataset = YoloDetectionDataset(manifest, config.data.class_names)
+    loader = DataLoader(
+        dataset,
+        batch_size=config.training.batch_size,
+        shuffle=False,
+        num_workers=config.training.workers,
+        collate_fn=detection_collate,
+    )
+    teacher.eval()
+    score_batches = []
+    correct_batches = []
+    for images, targets in loader:
+        device_images = [image.to(device) for image in images]
+        device_targets = move_targets(targets, device)
+        with torch.no_grad():
+            scores, correct = detection_calibration_pairs(
+                teacher(device_images),
+                device_targets,
+            )
+        if scores.numel():
+            score_batches.append(scores)
+            correct_batches.append(correct)
+    if score_batches:
+        calibrator.fit(torch.cat(score_batches), torch.cat(correct_batches))
+        (config.output_dir / "calibration.json").write_text(
+            json.dumps({"temperature": calibrator.temperature}, indent=2),
+            encoding="utf-8",
+        )
+
+
+def _optional_quality_gate(
+    config: ExperimentConfig,
+    device: torch.device,
+) -> QualityGate | None:
+    raw_path = config.raw.get("model", {}).get("quality_checkpoint")
+    if not raw_path:
+        return None
+    path = Path(raw_path).expanduser()
+    if not path.is_absolute():
+        path = config.project_root / path
+    return load_quality_gate(path, device) if path.is_file() else None

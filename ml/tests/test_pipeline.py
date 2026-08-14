@@ -10,7 +10,12 @@ from weldvision.data import (
     exact_duplicate_report,
     group_split,
 )
-from weldvision.metrics import box_iou, evaluate_detections, expected_calibration_error
+from weldvision.metrics import (
+    box_iou,
+    detection_calibration_pairs,
+    evaluate_detections,
+    expected_calibration_error,
+)
 from weldvision.model import create_mobile_detector
 from weldvision.pseudo import ScoreTemperature, select_pseudo_targets
 from weldvision.quality import heuristic_quality
@@ -103,6 +108,9 @@ def test_detection_metrics_match_by_class_and_iou() -> None:
     metrics = evaluate_detections([prediction], [target], 1)
     assert metrics[0].recall == 1.0
     assert metrics[0].precision == 0.5
+    scores, correct = detection_calibration_pairs([prediction], [target])
+    assert scores.tolist() == pytest.approx([0.9, 0.8])
+    assert correct.tolist() == [True, False]
 
 
 def test_mobile_detector_training_and_inference_contract() -> None:

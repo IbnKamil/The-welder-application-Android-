@@ -114,6 +114,45 @@ def expected_calibration_error(
     return float(error)
 
 
+def detection_calibration_pairs(
+    predictions: Sequence[dict[str, Tensor]],
+    targets: Sequence[dict[str, Tensor]],
+    *,
+    iou_threshold: float = 0.5,
+) -> tuple[Tensor, Tensor]:
+    """Label every scored detection as correct/incorrect for post-hoc calibration."""
+    if len(predictions) != len(targets):
+        raise ValueError("Predictions and targets must have equal length")
+    all_scores = []
+    all_correct = []
+    for prediction, target in zip(predictions, targets, strict=True):
+        scores = prediction["scores"]
+        order = scores.argsort(descending=True)
+        matched_truth: set[int] = set()
+        overlaps = box_iou(prediction["boxes"], target["boxes"])
+        correct = torch.zeros_like(scores, dtype=torch.bool)
+        for prediction_index in order.tolist():
+            best_iou = 0.0
+            best_truth = -1
+            for truth_index in range(len(target["boxes"])):
+                if truth_index in matched_truth:
+                    continue
+                if prediction["labels"][prediction_index] != target["labels"][truth_index]:
+                    continue
+                overlap = float(overlaps[prediction_index, truth_index])
+                if overlap > best_iou:
+                    best_iou = overlap
+                    best_truth = truth_index
+            if best_iou >= iou_threshold:
+                correct[prediction_index] = True
+                matched_truth.add(best_truth)
+        all_scores.append(scores.detach())
+        all_correct.append(correct)
+    if not all_scores:
+        return torch.empty(0), torch.empty(0, dtype=torch.bool)
+    return torch.cat(all_scores), torch.cat(all_correct)
+
+
 def risk_coverage(
     confidence: Tensor,
     errors: Tensor,

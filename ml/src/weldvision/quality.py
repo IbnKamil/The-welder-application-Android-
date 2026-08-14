@@ -27,9 +27,18 @@ class QualityGate(nn.Module):
         self.model = mobilenet_v3_small(weights=weights)
         input_features = self.model.classifier[-1].in_features
         self.model.classifier[-1] = nn.Linear(input_features, output_count)
+        self.register_buffer(
+            "normalization_mean",
+            torch.tensor([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1),
+        )
+        self.register_buffer(
+            "normalization_std",
+            torch.tensor([0.229, 0.224, 0.225]).reshape(1, 3, 1, 1),
+        )
 
     def forward(self, images: Tensor) -> Tensor:
-        return self.model(images)
+        normalized = (images - self.normalization_mean) / self.normalization_std
+        return self.model(normalized)
 
 
 def heuristic_quality(image: Tensor) -> QualityAssessment:

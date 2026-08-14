@@ -177,6 +177,29 @@ Bootstrap quality score нужен только для запуска первы
 диссертационного результата необходимо обучить отдельный gate на экспертных метках
 `acceptable/blur/underexposed/overexposed/glare/seam_too_small`.
 
+CSV для quality gate:
+
+```csv
+image_path,acceptable,blur,underexposed,overexposed,glare,seam_too_small
+../target/images/a-01.jpg,1,0,0,0,0,0
+../target/images/a-02.jpg,0,1,0,0,0,0
+```
+
+Обучение:
+
+```bash
+weldvision train-quality \
+  --manifest data/manifests/quality_train.csv \
+  --output outputs/quality/gate.pt \
+  --epochs 20 \
+  --device cuda
+```
+
+Если файл из `model.quality_checkpoint` существует, адаптационный trainer загрузит
+его автоматически; иначе явно используется только эвристический bootstrap. Teacher
+автоматически калибруется на `target_val` и сохраняет temperature в
+`outputs/lohi_to_mobile/calibration.json`. Test-разметка при калибровке не читается.
+
 ## Оценивание
 
 ```bash

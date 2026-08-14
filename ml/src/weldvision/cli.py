@@ -12,6 +12,7 @@ from weldvision.data import (
 )
 from weldvision.evaluation import evaluate_checkpoint
 from weldvision.export import export_onnx
+from weldvision.quality_training import train_quality_gate
 from weldvision.trainer import run_training
 
 
@@ -32,6 +33,16 @@ def main() -> None:
     train_parser.add_argument("--config", required=True)
     train_parser.add_argument("--device")
     train_parser.add_argument("--resume")
+
+    quality_parser = subparsers.add_parser(
+        "train-quality",
+        help="Train the smartphone capture quality gate",
+    )
+    quality_parser.add_argument("--manifest", required=True)
+    quality_parser.add_argument("--output", required=True)
+    quality_parser.add_argument("--epochs", type=int, default=20)
+    quality_parser.add_argument("--batch-size", type=int, default=16)
+    quality_parser.add_argument("--device")
 
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a checkpoint")
     evaluate_parser.add_argument("--config", required=True)
@@ -54,6 +65,15 @@ def main() -> None:
             load_config(args.config),
             device_name=args.device,
             resume=args.resume,
+        )
+        print(path)
+    elif args.command == "train-quality":
+        path = train_quality_gate(
+            args.manifest,
+            args.output,
+            epochs=args.epochs,
+            batch_size=args.batch_size,
+            device_name=args.device,
         )
         print(path)
     elif args.command == "evaluate":

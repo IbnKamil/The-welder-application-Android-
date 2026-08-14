@@ -38,6 +38,7 @@ class TrainingConfig:
 class ExperimentConfig:
     name: str
     seed: int
+    project_root: Path
     output_dir: Path
     data: DataConfig
     training: TrainingConfig
@@ -84,6 +85,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
     return ExperimentConfig(
         name=str(experiment["name"]),
         seed=int(experiment["seed"]),
+        project_root=root,
         output_dir=_resolve(root, experiment["output_dir"]),
         data=data_config,
         training=training_config,

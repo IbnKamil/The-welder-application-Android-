@@ -27,6 +27,7 @@ model:
     - overexposed
     - glare
     - seam_too_small
+  quality_checkpoint: outputs/quality/gate.pt
 
 training:
   source_epochs: 30
