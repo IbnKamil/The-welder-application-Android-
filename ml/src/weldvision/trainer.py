@@ -160,7 +160,10 @@ def run_training(
         collate_fn=unlabeled_collate,
     )
 
-    student = create_mobile_detector(len(config.data.class_names)).to(device)
+    student = create_mobile_detector(
+        len(config.data.class_names),
+        image_size=config.data.image_size,
+    ).to(device)
     teacher = create_ema_teacher(student).to(device)
     optimizer = AdamW(
         student.parameters(),

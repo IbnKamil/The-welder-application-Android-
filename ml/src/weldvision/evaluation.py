@@ -40,6 +40,7 @@ def evaluate_checkpoint(
     model = create_mobile_detector(
         len(config.data.class_names),
         pretrained_backbone=False,
+        image_size=config.data.image_size,
     ).to(device)
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     state = checkpoint.get("model") or checkpoint.get("student")

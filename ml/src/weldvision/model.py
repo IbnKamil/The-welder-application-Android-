@@ -12,17 +12,24 @@ def create_mobile_detector(
     defect_class_count: int,
     *,
     pretrained_backbone: bool = True,
+    image_size: int = 320,
 ) -> nn.Module:
     """Create a mobile student; detector classes include background internally."""
     if defect_class_count < 1:
         raise ValueError("At least one defect class is required")
+    if image_size < 320 or image_size % 32:
+        raise ValueError("Image size must be at least 320 and divisible by 32")
     backbone_weights = MobileNet_V3_Large_Weights.DEFAULT if pretrained_backbone else None
-    return ssdlite320_mobilenet_v3_large(
+    model = ssdlite320_mobilenet_v3_large(
         weights=None,
         weights_backbone=backbone_weights,
         num_classes=defect_class_count + 1,
         trainable_backbone_layers=6 if pretrained_backbone else None,
     )
+    model.transform.fixed_size = (image_size, image_size)
+    model.transform.min_size = (image_size,)
+    model.transform.max_size = image_size
+    return model
 
 
 def create_ema_teacher(student: nn.Module) -> nn.Module:
