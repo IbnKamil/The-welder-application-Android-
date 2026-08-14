@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from weldvision.config import load_config
+from weldvision.config import generate_b0_factor_ablations, load_config
 from weldvision.data import (
     exact_duplicate_report,
     group_split,
@@ -79,6 +79,14 @@ def main() -> None:
     export_parser.add_argument("--checkpoint", required=True)
     export_parser.add_argument("--output", required=True)
 
+    ablation_parser = subparsers.add_parser(
+        "generate-ablations",
+        help="Generate one-factor B0 ablation configs",
+    )
+    ablation_parser.add_argument("--base", required=True)
+    ablation_parser.add_argument("--output", required=True)
+    ablation_parser.add_argument("--results-root", required=True)
+
     args = parser.parse_args()
     if args.command == "split":
         _split(args.manifest, args.output, args.seed)
@@ -131,6 +139,13 @@ def main() -> None:
             args.output,
         )
         print(path)
+    elif args.command == "generate-ablations":
+        paths = generate_b0_factor_ablations(
+            args.base,
+            args.output,
+            args.results_root,
+        )
+        print("\n".join(str(path) for path in paths))
 
 
 def _split(manifest_path: str, output_path: str, seed: int) -> None:

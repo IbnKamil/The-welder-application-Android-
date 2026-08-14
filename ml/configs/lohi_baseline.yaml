@@ -46,6 +46,8 @@ training:
   photometric_augmentation: false
   validation_every: 1
   scheduler_eta_min: 0.000001
+  scheduler: constant
+  select_best_checkpoint: false
 
 calibration:
   initial_temperature: 1.0
@@ -54,6 +56,7 @@ calibration:
 evaluation:
   iou_thresholds: [0.5, 0.75]
   confidence_threshold: 0.25
+  ap_confidence_floor: 0.001
   bootstrap_samples: 1000
   random_seeds: [17, 42, 73]
 

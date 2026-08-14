@@ -2,8 +2,10 @@ from pathlib import Path
 
 import pytest
 import torch
+import yaml
 from PIL import Image
 
+from weldvision.config import generate_b0_factor_ablations
 from weldvision.data import (
     ManifestRow,
     YoloDetectionDataset,
@@ -125,6 +127,28 @@ def test_detection_metrics_match_by_class_and_iou() -> None:
     assert correct.tolist() == [True, False]
 
 
+def test_ap_uses_low_score_predictions_but_operating_metrics_do_not() -> None:
+    prediction = {
+        "boxes": torch.tensor([[0.0, 0.0, 10.0, 10.0]]),
+        "labels": torch.tensor([1]),
+        "scores": torch.tensor([0.10]),
+    }
+    target = {
+        "boxes": torch.tensor([[0.0, 0.0, 10.0, 10.0]]),
+        "labels": torch.tensor([1]),
+    }
+    metric = evaluate_detections(
+        [prediction],
+        [target],
+        1,
+        confidence_threshold=0.25,
+        ap_confidence_floor=0.001,
+    )[0]
+    assert metric.average_precision == 1.0
+    assert metric.precision == 0.0
+    assert metric.recall == 0.0
+
+
 def test_mobile_detector_training_and_inference_contract() -> None:
     model = create_mobile_detector(4, pretrained_backbone=False)
     images = [torch.rand(3, 320, 320), torch.rand(3, 320, 320)]
@@ -156,3 +180,15 @@ def test_mobile_detector_training_and_inference_contract() -> None:
         restored.state_dict()["backbone.features.1.0.3.0.weight"].shape
         == model.state_dict()["backbone.features.1.0.3.0.weight"].shape
     )
+
+
+def test_ablation_generator_changes_one_named_factor(tmp_path: Path) -> None:
+    base = Path(__file__).parents[1] / "configs/lohi_baseline.yaml"
+    paths = generate_b0_factor_ablations(base, tmp_path / "configs", tmp_path / "results")
+    assert len(paths) == 5
+    letterbox = yaml.safe_load(paths[0].read_text(encoding="utf-8"))
+    balanced = yaml.safe_load(paths[3].read_text(encoding="utf-8"))
+    assert letterbox["data"]["letterbox"] is True
+    assert letterbox["training"]["balanced_sampling"] is False
+    assert balanced["data"]["letterbox"] is False
+    assert balanced["training"]["balanced_sampling"] is True

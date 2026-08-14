@@ -40,16 +40,19 @@ def evaluate_detections(
     *,
     iou_threshold: float = 0.5,
     confidence_threshold: float = 0.25,
+    ap_confidence_floor: float = 0.001,
 ) -> list[ClassMetrics]:
     if len(predictions) != len(targets):
         raise ValueError("Predictions and targets must have equal length")
+    if not 0 <= ap_confidence_floor <= confidence_threshold <= 1:
+        raise ValueError("Expected 0 <= AP floor <= operating threshold <= 1")
     metrics = []
     for class_id in range(1, class_count + 1):
         scored_matches: list[tuple[float, bool]] = []
         ground_truth_count = 0
         for prediction, target in zip(predictions, targets, strict=True):
             prediction_mask = (prediction["labels"] == class_id) & (
-                prediction["scores"] >= confidence_threshold
+                prediction["scores"] >= ap_confidence_floor
             )
             target_mask = target["labels"] == class_id
             boxes = prediction["boxes"][prediction_mask]
@@ -80,8 +83,13 @@ def evaluate_detections(
         precision_curve = true_positives / np.maximum(true_positives + false_positives, 1)
         recall_curve = true_positives / max(ground_truth_count, 1)
         average_precision = _interpolated_ap(precision_curve, recall_curve)
-        true_positive_count = int(true_positives[-1]) if len(true_positives) else 0
-        false_positive_count = int(false_positives[-1]) if len(false_positives) else 0
+        operating_matches = [
+            is_match
+            for score, is_match in scored_matches
+            if score >= confidence_threshold
+        ]
+        true_positive_count = sum(operating_matches)
+        false_positive_count = len(operating_matches) - true_positive_count
         metrics.append(
             ClassMetrics(
                 class_id=class_id,

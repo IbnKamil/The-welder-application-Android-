@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,8 @@ class TrainingConfig:
     photometric_augmentation: bool
     validation_every: int
     scheduler_eta_min: float
+    scheduler: str
+    select_best_checkpoint: bool
 
 
 @dataclass(frozen=True)
@@ -93,9 +96,13 @@ def load_config(path: str | Path) -> ExperimentConfig:
         photometric_augmentation=bool(training.get("photometric_augmentation", False)),
         validation_every=int(training.get("validation_every", 1)),
         scheduler_eta_min=float(training.get("scheduler_eta_min", 1e-6)),
+        scheduler=str(training.get("scheduler", "cosine")),
+        select_best_checkpoint=bool(training.get("select_best_checkpoint", True)),
     )
     if training_config.validation_every < 1:
         raise ValueError("training.validation_every must be at least 1")
+    if training_config.scheduler not in {"constant", "cosine"}:
+        raise ValueError("training.scheduler must be constant or cosine")
     return ExperimentConfig(
         name=str(experiment["name"]),
         seed=int(experiment["seed"]),
@@ -110,3 +117,42 @@ def load_config(path: str | Path) -> ExperimentConfig:
 def _resolve(root: Path, value: str) -> Path:
     path = Path(value).expanduser()
     return path if path.is_absolute() else (root / path).resolve()
+
+
+def generate_b0_factor_ablations(
+    base_path: str | Path,
+    output_directory: str | Path,
+    results_root: str | Path,
+) -> list[Path]:
+    """Generate one-factor-at-a-time configs from the frozen B0 settings."""
+    base = Path(base_path).expanduser().resolve()
+    with base.open("r", encoding="utf-8") as stream:
+        source = yaml.safe_load(stream)
+    experiments = {
+        "a1_letterbox_only": {("data", "letterbox"): True},
+        "a2_best_checkpoint_only": {("training", "select_best_checkpoint"): True},
+        "a3_cosine_scheduler_only": {("training", "scheduler"): "cosine"},
+        "a4_balanced_sampler_only": {("training", "balanced_sampling"): True},
+        "a5_photometric_only": {("training", "photometric_augmentation"): True},
+    }
+    output = Path(output_directory).expanduser().resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    result_root = Path(results_root).expanduser()
+    paths = []
+    for name, overrides in experiments.items():
+        config = copy.deepcopy(source)
+        config["experiment"]["name"] = name
+        config["experiment"]["output_dir"] = str(result_root / name)
+        config["training"]["validation_every"] = 5
+        for keys, value in overrides.items():
+            current = config
+            for key in keys[:-1]:
+                current = current[key]
+            current[keys[-1]] = value
+        path = output / f"{name}.yaml"
+        path.write_text(
+            yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
+            encoding="utf-8",
+        )
+        paths.append(path)
+    return paths

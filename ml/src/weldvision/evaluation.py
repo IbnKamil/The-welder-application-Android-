@@ -64,6 +64,7 @@ def evaluate_checkpoint(
 
     thresholds = config.raw.get("evaluation", {}).get("iou_thresholds", [0.5])
     confidence = float(config.raw.get("evaluation", {}).get("confidence_threshold", 0.25))
+    ap_floor = float(config.raw.get("evaluation", {}).get("ap_confidence_floor", 0.001))
     reports = {}
     for threshold in thresholds:
         metrics = evaluate_detections(
@@ -72,6 +73,7 @@ def evaluate_checkpoint(
             len(config.data.class_names),
             iou_threshold=float(threshold),
             confidence_threshold=confidence,
+            ap_confidence_floor=ap_floor,
         )
         reports[f"iou_{float(threshold):.2f}"] = [
             {
@@ -84,6 +86,7 @@ def evaluate_checkpoint(
         "split": split,
         "images": len(dataset),
         "confidence_threshold": confidence,
+        "ap_confidence_floor": ap_floor,
         "reports": reports,
     }
     output_path = config.output_dir / f"evaluation_{split}.json"

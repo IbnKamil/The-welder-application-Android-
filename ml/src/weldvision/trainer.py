@@ -10,7 +10,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, LambdaLR, LRScheduler
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from weldvision.config import ExperimentConfig
@@ -191,14 +191,18 @@ def run_training(
         lr=config.training.learning_rate,
         weight_decay=config.training.weight_decay,
     )
-    scheduler = CosineAnnealingLR(
-        optimizer,
-        T_max=max(
-            config.training.source_epochs + config.training.adaptation_epochs,
-            1,
-        ),
-        eta_min=config.training.scheduler_eta_min,
-    )
+    scheduler: LRScheduler
+    if config.training.scheduler == "cosine":
+        scheduler = CosineAnnealingLR(
+            optimizer,
+            T_max=max(
+                config.training.source_epochs + config.training.adaptation_epochs,
+                1,
+            ),
+            eta_min=config.training.scheduler_eta_min,
+        )
+    else:
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda _: 1.0)
     start_phase = "source"
     start_epoch = 0
     best_validation_ap = -1.0
@@ -255,7 +259,7 @@ def run_training(
                 config,
             )
         best_path = output_dir / "student_best.pt"
-        if best_path.is_file():
+        if config.training.select_best_checkpoint and best_path.is_file():
             best_checkpoint = torch.load(best_path, map_location=device, weights_only=False)
             student.load_state_dict(best_checkpoint["model"])
             update_ema_teacher(teacher, student, 0.0)
@@ -341,7 +345,7 @@ def _save_checkpoint(
     student: nn.Module,
     teacher: nn.Module,
     optimizer: torch.optim.Optimizer,
-    scheduler: CosineAnnealingLR,
+    scheduler: LRScheduler,
     best_validation_ap: float,
     config: ExperimentConfig,
 ) -> None:
