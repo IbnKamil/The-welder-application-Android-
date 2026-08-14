@@ -166,16 +166,24 @@ def _split_groups(
     rows: list[dict[str, Any]],
     seed: int,
 ) -> dict[str, list[dict[str, Any]]]:
-    groups = sorted({row["group_id"] for row in rows})
-    rng = random.Random(seed)
-    rng.shuffle(groups)
-    test_count = max(1, round(len(groups) * 0.20))
-    val_count = max(1, round(len(groups) * 0.20))
-    test_groups = set(groups[:test_count])
-    val_groups = set(groups[test_count : test_count + val_count])
-    train_groups = set(groups[test_count + val_count :])
-    if not train_groups:
-        raise ValueError("Not enough sequence groups for a train split")
+    by_resolution: dict[str, list[str]] = {"high": [], "low": []}
+    for group in sorted({row["group_id"] for row in rows}):
+        resolution = group.split("-", 2)[1]
+        by_resolution[resolution].append(group)
+    train_groups: set[str] = set()
+    val_groups: set[str] = set()
+    test_groups: set[str] = set()
+    for offset, (resolution, groups) in enumerate(by_resolution.items()):
+        rng = random.Random(seed + offset)
+        rng.shuffle(groups)
+        test_count = max(1, round(len(groups) * 0.20))
+        val_count = max(1, round(len(groups) * 0.20))
+        test_groups.update(groups[:test_count])
+        val_groups.update(groups[test_count : test_count + val_count])
+        resolution_train = groups[test_count + val_count :]
+        train_groups.update(resolution_train)
+        if not resolution_train:
+            raise ValueError(f"Not enough {resolution} groups for a train split")
     assignments = {
         **{group: "train" for group in train_groups},
         **{group: "val" for group in val_groups},
