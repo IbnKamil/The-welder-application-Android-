@@ -1,6 +1,7 @@
 package ru.svarshik.pro
 
 import android.Manifest
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -48,6 +49,7 @@ import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -164,6 +166,8 @@ private fun SvarshikProApp() {
                 code = document.code,
                 title = document.title,
                 assetName = document.assetName,
+                localFilePath = document.localFilePath,
+                sourceLabel = document.sourceLabel,
                 onBack = { selectedGost = null },
             )
             return@Scaffold
@@ -478,7 +482,9 @@ internal data class DocumentItem(
     val title: String,
     val meta: String,
     val tag: String,
-    val assetName: String,
+    val assetName: String? = null,
+    val localFilePath: String? = null,
+    val sourceLabel: String = "awelding.ru",
 )
 
 @Composable
@@ -486,8 +492,33 @@ private fun GostScreen(
     padding: PaddingValues,
     onDocumentSelected: (DocumentItem) -> Unit,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var query by remember { mutableStateOf("") }
-    val documents = listOf(
+    var selectedTag by remember { mutableStateOf("Все") }
+    var userDocuments by remember { mutableStateOf(GostRepository.loadDocuments(context)) }
+    var customTags by remember { mutableStateOf(GostRepository.loadCustomTags(context)) }
+    var pendingDocumentUri by remember { mutableStateOf<Uri?>(null) }
+    var documentTitle by remember { mutableStateOf("") }
+    var documentTag by remember { mutableStateOf(GostRepository.defaultTags.first()) }
+    var showDocumentDialog by remember { mutableStateOf(false) }
+    var showTagDialog by remember { mutableStateOf(false) }
+    var newTagName by remember { mutableStateOf("") }
+    var actionError by remember { mutableStateOf<String?>(null) }
+    val documentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            pendingDocumentUri = uri
+            documentTitle = GostRepository.suggestedTitle(context, uri)
+            documentTag = selectedTag
+                .takeIf { it != "Все" }
+                ?: GostRepository.defaultTags.first()
+            actionError = null
+            showDocumentDialog = true
+        }
+    }
+    val bundledDocuments = listOf(
         DocumentItem("ГОСТ EN 1011-6—2017", "Сварка. Рекомендации по сварке металлических материалов. Часть 6. Лазерная сварка", "Офлайн · 39 страниц", "Лазер", "gost-en-1011-6-2017.pdf"),
         DocumentItem("ГОСТ 2246—70", "Проволока стальная сварочная. Технические условия", "Офлайн · 19 страниц", "Материалы", "gost-2246-70.pdf"),
         DocumentItem("ГОСТ 2601—84", "Сварка металлов. Термины и определения основных понятий", "Офлайн · 57 страниц", "Термины", "gost-2601-84.pdf"),
@@ -517,34 +548,216 @@ private fun GostScreen(
         DocumentItem("ГОСТ 33857—2016", "Арматура трубопроводная. Сварка и контроль качества сварных соединений", "Офлайн · 88 страниц", "Трубы", "gost-33857-2016.pdf"),
         DocumentItem("ГОСТ 34061—2017", "Определение содержания водорода в наплавленном металле и металле шва", "Офлайн · 36 страниц", "Водород", "gost-34061-2017-iso3690.pdf"),
     )
-    val filteredDocuments = documents.filter {
-        query.isBlank() ||
-            it.code.contains(query, ignoreCase = true) ||
-            it.title.contains(query, ignoreCase = true) ||
-            it.tag.contains(query, ignoreCase = true)
+    val documents = bundledDocuments + userDocuments.map { document ->
+        DocumentItem(
+            code = "МОЙ ДОКУМЕНТ",
+            title = document.title,
+            meta = "Добавлен вами · доступен офлайн",
+            tag = document.tag,
+            localFilePath = GostRepository.documentFile(context, document).absolutePath,
+            sourceLabel = "добавлено пользователем",
+        )
     }
+    val allTags = listOf("Все") + GostRepository.defaultTags + customTags
+    val normalizedQuery = query.trim()
+    val filteredDocuments = documents.filter {
+        (selectedTag == "Все" || it.tag.equals(selectedTag, ignoreCase = true)) &&
+            (
+                normalizedQuery.isBlank() ||
+                    it.code.contains(normalizedQuery, ignoreCase = true) ||
+                    it.title.contains(normalizedQuery, ignoreCase = true) ||
+                    it.tag.contains(normalizedQuery, ignoreCase = true)
+                )
+    }
+
+    if (showDocumentDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showDocumentDialog = false
+                pendingDocumentUri = null
+            },
+            title = { Text("Добавить документ", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = documentTitle,
+                        onValueChange = {
+                            documentTitle = it
+                            actionError = null
+                        },
+                        label = { Text("Название ГОСТа или документа") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                    )
+                    Text("Выберите тег", color = TextSecondary, fontSize = 12.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        items(allTags.filterNot { it == "Все" }) { tag ->
+                            FilterChipLabel(
+                                text = tag,
+                                selected = documentTag == tag,
+                                onClick = { documentTag = tag },
+                            )
+                        }
+                    }
+                    actionError?.let {
+                        Text(it, color = Color(0xFFB3261E), fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val uri = pendingDocumentUri ?: return@TextButton
+                        scope.launch {
+                            runCatching {
+                                withContext(Dispatchers.IO) {
+                                    GostRepository.importDocument(
+                                        context = context,
+                                        uri = uri,
+                                        rawTitle = documentTitle,
+                                        tag = documentTag,
+                                    )
+                                }
+                            }.onSuccess {
+                                userDocuments = GostRepository.loadDocuments(context)
+                                showDocumentDialog = false
+                                pendingDocumentUri = null
+                                query = ""
+                                selectedTag = "Все"
+                            }.onFailure {
+                                actionError = it.localizedMessage ?: "Не удалось добавить документ"
+                            }
+                        }
+                    },
+                ) {
+                    Text("Добавить", color = Orange, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDocumentDialog = false
+                        pendingDocumentUri = null
+                    },
+                ) {
+                    Text("Отмена")
+                }
+            },
+        )
+    }
+
+    if (showTagDialog) {
+        AlertDialog(
+            onDismissRequest = { showTagDialog = false },
+            title = { Text("Новый тег", fontWeight = FontWeight.ExtraBold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = newTagName,
+                        onValueChange = {
+                            newTagName = it
+                            actionError = null
+                        },
+                        label = { Text("Название тега") },
+                        placeholder = { Text("Например: Лазерная сварка") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                    )
+                    actionError?.let {
+                        Text(it, color = Color(0xFFB3261E), fontSize = 12.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        runCatching { GostRepository.addTag(context, newTagName) }
+                            .onSuccess { tag ->
+                                customTags = GostRepository.loadCustomTags(context)
+                                selectedTag = tag
+                                documentTag = tag
+                                newTagName = ""
+                                showTagDialog = false
+                            }
+                            .onFailure {
+                                actionError = it.localizedMessage ?: "Не удалось добавить тег"
+                            }
+                    },
+                ) {
+                    Text("Сохранить", color = Orange, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTagDialog = false }) {
+                    Text("Отмена")
+                }
+            },
+        )
+    }
+
     ContentList(
         padding = padding,
         title = "Нормативные документы",
-        subtitle = "28 документов доступны без интернета",
+        subtitle = "${documents.size} документов доступны без интернета",
         searchHint = "Найти по номеру или названию",
         searchValue = query,
         onSearchValueChange = { query = it },
     ) {
         item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(listOf("Все", "РДС", "MIG/MAG", "TIG", "Контроль", "Трубы")) {
-                    FilterChipLabel(it, selected = it == "Все")
+            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                Button(
+                    onClick = { documentPicker.launch(arrayOf("application/pdf")) },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Orange),
+                ) {
+                    Icon(Icons.Outlined.Add, contentDescription = null)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Добавить", fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = {
+                        actionError = null
+                        newTagName = ""
+                        showTagDialog = true
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(50.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.White,
+                        contentColor = TextPrimary,
+                    ),
+                ) {
+                    Text("+ Новый тег", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
-        items(filteredDocuments) { document ->
+        item {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(allTags) { tag ->
+                    FilterChipLabel(
+                        text = tag,
+                        selected = selectedTag == tag,
+                        onClick = { selectedTag = tag },
+                    )
+                }
+            }
+        }
+        items(filteredDocuments, key = { it.localFilePath ?: it.assetName.orEmpty() }) { document ->
             DocumentCard(document, onClick = { onDocumentSelected(document) })
         }
         if (filteredDocuments.isEmpty()) {
             item {
                 Text(
-                    "По запросу «$query» ничего не найдено",
+                    if (normalizedQuery.isNotBlank()) {
+                        "По запросу «$query» ничего не найдено"
+                    } else {
+                        "В теге «$selectedTag» пока нет документов"
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 30.dp),
@@ -637,10 +850,11 @@ private fun LibraryScreen(
             }
         }
     }
+    val normalizedBookQuery = query.trim()
     val filteredBooks = books.filter {
-        query.isBlank() ||
-            it.title.contains(query, ignoreCase = true) ||
-            it.format.contains(query, ignoreCase = true)
+        normalizedBookQuery.isBlank() ||
+            it.title.contains(normalizedBookQuery, ignoreCase = true) ||
+            it.format.contains(normalizedBookQuery, ignoreCase = true)
     }
 
     ContentList(
@@ -694,7 +908,7 @@ private fun LibraryScreen(
             if (filteredBooks.isEmpty()) {
                 item {
                     Text(
-                        "По запросу «$query» ничего не найдено",
+                        "По запросу «$normalizedBookQuery» ничего не найдено",
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 28.dp),
@@ -1171,11 +1385,15 @@ private fun ContentList(
 }
 
 @Composable
-private fun FilterChipLabel(text: String, selected: Boolean) {
+private fun FilterChipLabel(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit = {},
+) {
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = if (selected) Navy else Color.White,
-        modifier = Modifier.clickable { },
+        modifier = Modifier.clickable(onClick = onClick),
     ) {
         Text(
             text,

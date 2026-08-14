@@ -80,32 +80,45 @@ internal fun OfflinePdfReaderScreen(
     padding: PaddingValues,
     code: String,
     title: String,
-    assetName: String,
+    assetName: String? = null,
+    localFilePath: String? = null,
+    sourceLabel: String = "awelding.ru",
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    var session by remember(assetName) { mutableStateOf<PdfSession?>(null) }
-    var currentPage by remember(assetName) { mutableIntStateOf(0) }
-    var pageBitmap by remember(assetName) { mutableStateOf<Bitmap?>(null) }
-    var errorMessage by remember(assetName) { mutableStateOf<String?>(null) }
-    var isLoading by remember(assetName) { mutableStateOf(true) }
+    val documentKey = localFilePath ?: assetName.orEmpty()
+    var session by remember(documentKey) { mutableStateOf<PdfSession?>(null) }
+    var currentPage by remember(documentKey) { mutableIntStateOf(0) }
+    var pageBitmap by remember(documentKey) { mutableStateOf<Bitmap?>(null) }
+    var errorMessage by remember(documentKey) { mutableStateOf<String?>(null) }
+    var isLoading by remember(documentKey) { mutableStateOf(true) }
     var scale by remember(currentPage) { mutableFloatStateOf(1f) }
     var offset by remember(currentPage) { mutableStateOf(Offset.Zero) }
 
     BackHandler(onBack = onBack)
 
-    LaunchedEffect(assetName) {
+    LaunchedEffect(documentKey) {
         isLoading = true
         errorMessage = null
         runCatching {
             withContext(Dispatchers.IO) {
-                val cacheDirectory = File(context.cacheDir, "offline_gosts").apply { mkdirs() }
-                val cachedFile = File(cacheDirectory, assetName)
-                context.assets.open("gosts/$assetName").use { input ->
-                    FileOutputStream(cachedFile, false).use { output -> input.copyTo(output) }
+                val sourceFile = if (localFilePath != null) {
+                    File(localFilePath).also {
+                        require(it.isFile) { "Файл документа не найден" }
+                    }
+                } else {
+                    val bundledAsset = requireNotNull(assetName) {
+                        "Источник документа не указан"
+                    }
+                    val cacheDirectory = File(context.cacheDir, "offline_gosts").apply { mkdirs() }
+                    File(cacheDirectory, bundledAsset).also { cachedFile ->
+                        context.assets.open("gosts/$bundledAsset").use { input ->
+                            FileOutputStream(cachedFile, false).use { output -> input.copyTo(output) }
+                        }
+                    }
                 }
                 val descriptor = ParcelFileDescriptor.open(
-                    cachedFile,
+                    sourceFile,
                     ParcelFileDescriptor.MODE_READ_ONLY,
                 )
                 PdfSession(descriptor, PdfRenderer(descriptor))
@@ -315,7 +328,7 @@ internal fun OfflinePdfReaderScreen(
                     }
                 }
                 Text(
-                    "Источник: awelding.ru",
+                    "Источник: $sourceLabel",
                     color = ReaderSecondary,
                     fontSize = 9.sp,
                     modifier = Modifier.padding(top = 5.dp),
