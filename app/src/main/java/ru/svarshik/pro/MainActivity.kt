@@ -654,13 +654,7 @@ private fun LibraryScreen(
         item {
             Button(
                 onClick = {
-                    filePicker.launch(
-                        arrayOf(
-                            "application/pdf",
-                            "application/epub+zip",
-                            "text/plain",
-                        ),
-                    )
+                    filePicker.launch(arrayOf("*/*"))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -675,7 +669,7 @@ private fun LibraryScreen(
         }
         item {
             Text(
-                "Поддерживаемые форматы: PDF, EPUB и TXT",
+                "Поддерживаемые форматы: PDF, EPUB, FB2 и TXT",
                 color = TextSecondary,
                 fontSize = 11.sp,
                 modifier = Modifier.fillMaxWidth(),

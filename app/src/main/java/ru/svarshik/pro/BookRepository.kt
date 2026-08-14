@@ -19,7 +19,7 @@ internal data class UserBook(
 internal object BookRepository {
     private const val preferencesName = "user_library"
     private const val booksKey = "books"
-    private val supportedFormats = setOf("pdf", "epub", "txt")
+    private val supportedFormats = setOf("pdf", "epub", "fb2", "txt")
 
     fun loadBooks(context: Context): List<UserBook> {
         val source = context
@@ -49,7 +49,7 @@ internal object BookRepository {
         val originalName = displayName(context, uri)
         val format = detectFormat(context, uri, originalName)
         require(format in supportedFormats) {
-            "Поддерживаются только PDF, EPUB и TXT"
+            "Поддерживаются только PDF, EPUB, FB2 и TXT"
         }
 
         val title = originalName
@@ -136,6 +136,7 @@ internal object BookRepository {
         return when (context.contentResolver.getType(uri)?.lowercase()) {
             "application/pdf" -> "pdf"
             "application/epub+zip" -> "epub"
+            "application/x-fictionbook+xml" -> "fb2"
             "text/plain" -> "txt"
             else -> extension
         }

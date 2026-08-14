@@ -67,6 +67,7 @@ import org.xmlpull.v1.XmlPullParser
 import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.Charset
+import java.nio.file.Paths
 import java.util.zip.ZipFile
 
 private val BookNavy = Color(0xFF101922)
@@ -333,7 +334,11 @@ private fun UserTextReader(
         runCatching {
             withContext(Dispatchers.IO) {
                 val file = BookRepository.bookFile(context, book)
-                if (book.format == "epub") extractEpubText(file) else readTextFile(file)
+                when (book.format) {
+                    "epub" -> extractEpubText(file)
+                    "fb2" -> extractFb2Text(file)
+                    else -> readTextFile(file)
+                }
             }
         }.onSuccess {
             content = it
@@ -489,6 +494,30 @@ private fun extractEpubText(file: File): String {
     }
 }
 
+private fun extractFb2Text(file: File): String {
+    file.inputStream().use { input ->
+        val parser = Xml.newPullParser().apply { setInput(input, null) }
+        val text = StringBuilder()
+        while (parser.eventType != XmlPullParser.END_DOCUMENT) {
+            when (parser.eventType) {
+                XmlPullParser.TEXT -> text.append(parser.text)
+                XmlPullParser.END_TAG -> {
+                    if (parser.name in setOf("p", "title", "subtitle", "section", "empty-line")) {
+                        text.append('\n')
+                    }
+                }
+            }
+            parser.next()
+        }
+        return text.toString()
+            .lineSequence()
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .joinToString("\n\n")
+            .also { require(it.isNotBlank()) { "В FB2 не найден читаемый текст" } }
+    }
+}
+
 private fun epubSpineEntries(archive: ZipFile, rootFile: String): List<String> {
     val opfEntry = archive.getEntry(rootFile) ?: return emptyList()
     val manifest = mutableMapOf<String, String>()
@@ -512,6 +541,6 @@ private fun epubSpineEntries(archive: ZipFile, rootFile: String): List<String> {
     val basePath = rootFile.substringBeforeLast('/', "")
     return spine.mapNotNull(manifest::get).map { href ->
         val decoded = URLDecoder.decode(href.substringBefore('#'), "UTF-8")
-        if (basePath.isBlank()) decoded else "$basePath/$decoded"
+        Paths.get(basePath, decoded).normalize().toString().replace('\\', '/')
     }
 }
