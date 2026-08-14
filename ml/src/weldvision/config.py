@@ -17,6 +17,7 @@ class DataConfig:
     target_test: Path
     class_names: tuple[str, ...]
     image_size: int
+    letterbox: bool
     group_manifest: Path
 
 
@@ -33,6 +34,10 @@ class TrainingConfig:
     pseudo_threshold: float
     quality_threshold_strength: float
     checkpoint_every: int
+    balanced_sampling: bool
+    photometric_augmentation: bool
+    validation_every: int
+    scheduler_eta_min: float
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
         target_test=_resolve(root, data["target_test"]),
         class_names=tuple(data["class_names"]),
         image_size=int(data["image_size"]),
+        letterbox=bool(data.get("letterbox", True)),
         group_manifest=_resolve(root, data["group_manifest"]),
     )
     training_config = TrainingConfig(
@@ -83,7 +89,13 @@ def load_config(path: str | Path) -> ExperimentConfig:
         pseudo_threshold=float(training["pseudo_threshold"]),
         quality_threshold_strength=float(training["quality_threshold_strength"]),
         checkpoint_every=int(training["checkpoint_every"]),
+        balanced_sampling=bool(training.get("balanced_sampling", False)),
+        photometric_augmentation=bool(training.get("photometric_augmentation", False)),
+        validation_every=int(training.get("validation_every", 1)),
+        scheduler_eta_min=float(training.get("scheduler_eta_min", 1e-6)),
     )
+    if training_config.validation_every < 1:
+        raise ValueError("training.validation_every must be at least 1")
     return ExperimentConfig(
         name=str(experiment["name"]),
         seed=int(experiment["seed"]),

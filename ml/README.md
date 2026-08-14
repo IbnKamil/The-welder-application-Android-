@@ -233,6 +233,41 @@ weldvision evaluate \
 после фиксации конфигурации. Для доверительных интервалов повторите baseline с seeds
 из конфигурации.
 
+Результат первой контрольной модели B0 зафиксирован в
+[`results/B0_SEQUENCE_SAFE_BASELINE.md`](results/B0_SEQUENCE_SAFE_BASELINE.md).
+Улучшенный B1 устраняет заранее сформулированные недостатки B0:
+
+- letterbox вместо геометрического растягивания;
+- inverse-sqrt class-balanced sampler;
+- smartphone-like photometric augmentation;
+- cosine learning-rate scheduler;
+- validation каждые 5 эпох;
+- сохранение `student_best.pt` по macro AP50.
+
+```bash
+weldvision train \
+  --config configs/lohi_baseline_b1.yaml \
+  --device cuda
+
+weldvision evaluate \
+  --config configs/lohi_baseline_b1.yaml \
+  --checkpoint outputs/lohi_baseline_b1/student_best.pt \
+  --split source_test \
+  --device cuda
+```
+
+Для контроля влияния способа разбиения та же B1-конфигурация запускается на
+опубликованном fold 0:
+
+```bash
+weldvision train \
+  --config configs/lohi_official_control.yaml \
+  --device cuda
+```
+
+Сначала сравниваются B0 и B1 на одном sequence-safe test. Official-control отвечает
+на отдельный вопрос о влиянии image-level split и не подменяет основной test.
+
 После появления собственного smartphone target настройте
 `configs/lohi_to_mobile.yaml`, затем:
 

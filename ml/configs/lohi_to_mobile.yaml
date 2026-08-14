@@ -16,6 +16,7 @@ data:
     - discontinuity
     - stain
   image_size: 640
+  letterbox: true
   group_manifest: data/manifests/groups.csv
 
 model:
@@ -42,6 +43,10 @@ training:
   pseudo_threshold: 0.65
   quality_threshold_strength: 0.25
   checkpoint_every: 1
+  balanced_sampling: true
+  photometric_augmentation: true
+  validation_every: 5
+  scheduler_eta_min: 0.000001
 
 calibration:
   initial_temperature: 1.0

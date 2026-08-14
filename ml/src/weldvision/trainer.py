@@ -10,16 +10,18 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 from torch.optim import AdamW
-from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from weldvision.config import ExperimentConfig
 from weldvision.data import (
     UnlabeledImageDataset,
     YoloDetectionDataset,
+    balanced_sample_weights,
     detection_collate,
     unlabeled_collate,
 )
-from weldvision.metrics import detection_calibration_pairs
+from weldvision.metrics import detection_calibration_pairs, evaluate_detections
 from weldvision.model import (
     create_ema_teacher,
     create_mobile_detector,
@@ -147,11 +149,35 @@ def run_training(
     source_dataset = YoloDetectionDataset(
         config.data.source_train,
         config.data.class_names,
+        image_size=config.data.image_size if config.data.letterbox else None,
+        photometric_augmentation=config.training.photometric_augmentation,
+    )
+    source_val_dataset = YoloDetectionDataset(
+        config.data.source_val,
+        config.data.class_names,
+        image_size=config.data.image_size if config.data.letterbox else None,
+    )
+    sampler = (
+        WeightedRandomSampler(
+            balanced_sample_weights(source_dataset),
+            num_samples=len(source_dataset),
+            replacement=True,
+        )
+        if config.training.balanced_sampling
+        else None
     )
     source_loader = DataLoader(
         source_dataset,
         batch_size=config.training.batch_size,
-        shuffle=True,
+        shuffle=sampler is None,
+        sampler=sampler,
+        num_workers=config.training.workers,
+        collate_fn=detection_collate,
+    )
+    source_val_loader = DataLoader(
+        source_val_dataset,
+        batch_size=config.training.batch_size,
+        shuffle=False,
         num_workers=config.training.workers,
         collate_fn=detection_collate,
     )
@@ -165,15 +191,27 @@ def run_training(
         lr=config.training.learning_rate,
         weight_decay=config.training.weight_decay,
     )
+    scheduler = CosineAnnealingLR(
+        optimizer,
+        T_max=max(
+            config.training.source_epochs + config.training.adaptation_epochs,
+            1,
+        ),
+        eta_min=config.training.scheduler_eta_min,
+    )
     start_phase = "source"
     start_epoch = 0
+    best_validation_ap = -1.0
     if resume:
         checkpoint = torch.load(resume, map_location=device, weights_only=False)
         student.load_state_dict(checkpoint["student"])
         teacher.load_state_dict(checkpoint["teacher"])
         optimizer.load_state_dict(checkpoint["optimizer"])
+        if checkpoint.get("scheduler"):
+            scheduler.load_state_dict(checkpoint["scheduler"])
         start_phase = checkpoint["phase"]
         start_epoch = int(checkpoint["epoch"]) + 1
+        best_validation_ap = float(checkpoint.get("best_validation_ap", -1.0))
 
     calibrator = ScoreTemperature(
         float(config.raw.get("calibration", {}).get("initial_temperature", 1.0))
@@ -185,8 +223,42 @@ def run_training(
         for epoch in range(start_epoch, config.training.source_epochs):
             metrics = train_source_epoch(student, source_loader, optimizer, device)
             update_ema_teacher(teacher, student, 0.0)
+            scheduler.step()
+            metrics["learning_rate"] = optimizer.param_groups[0]["lr"]
+            if (epoch + 1) % config.training.validation_every == 0:
+                validation = validate_detector(
+                    student,
+                    source_val_loader,
+                    device,
+                    len(config.data.class_names),
+                )
+                metrics.update(validation)
+                if validation["validation_macro_ap50"] > best_validation_ap:
+                    best_validation_ap = validation["validation_macro_ap50"]
+                    _save_best_model(
+                        output_dir,
+                        epoch,
+                        student,
+                        config,
+                        validation,
+                    )
             _write_metrics(log_path, "source", epoch, metrics)
-            _save_checkpoint(output_dir, "source", epoch, student, teacher, optimizer, config)
+            _save_checkpoint(
+                output_dir,
+                "source",
+                epoch,
+                student,
+                teacher,
+                optimizer,
+                scheduler,
+                best_validation_ap,
+                config,
+            )
+        best_path = output_dir / "student_best.pt"
+        if best_path.is_file():
+            best_checkpoint = torch.load(best_path, map_location=device, weights_only=False)
+            student.load_state_dict(best_checkpoint["model"])
+            update_ema_teacher(teacher, student, 0.0)
         start_epoch = 0
 
     _fit_teacher_calibration(config, teacher, calibrator, device)
@@ -204,7 +276,11 @@ def run_training(
         )
         return final_path
 
-    target_dataset = UnlabeledImageDataset(config.data.target_unlabeled, config.seed)
+    target_dataset = UnlabeledImageDataset(
+        config.data.target_unlabeled,
+        config.seed,
+        image_size=config.data.image_size if config.data.letterbox else None,
+    )
     if not len(target_dataset):
         raise ValueError("Target unlabeled manifest is empty; adaptation cannot start")
     target_loader = DataLoader(
@@ -230,8 +306,20 @@ def run_training(
             ema_decay=config.training.ema_decay,
             quality_gate=quality_gate,
         )
+        scheduler.step()
+        metrics["learning_rate"] = optimizer.param_groups[0]["lr"]
         _write_metrics(log_path, "adaptation", epoch, metrics)
-        _save_checkpoint(output_dir, "adaptation", epoch, student, teacher, optimizer, config)
+        _save_checkpoint(
+            output_dir,
+            "adaptation",
+            epoch,
+            student,
+            teacher,
+            optimizer,
+            scheduler,
+            best_validation_ap,
+            config,
+        )
 
     final_path = output_dir / "student_final.pt"
     torch.save(
@@ -253,6 +341,8 @@ def _save_checkpoint(
     student: nn.Module,
     teacher: nn.Module,
     optimizer: torch.optim.Optimizer,
+    scheduler: CosineAnnealingLR,
+    best_validation_ap: float,
     config: ExperimentConfig,
 ) -> None:
     if (epoch + 1) % config.training.checkpoint_every:
@@ -264,10 +354,72 @@ def _save_checkpoint(
             "student": student.state_dict(),
             "teacher": teacher.state_dict(),
             "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "best_validation_ap": best_validation_ap,
             "config": config.raw,
             "model_spec": mobile_model_spec(config.data.image_size),
         },
         output_dir / "last.pt",
+    )
+
+
+@torch.no_grad()
+def validate_detector(
+    model: nn.Module,
+    loader: Iterable[tuple[list[Tensor], list[dict[str, Tensor]]]],
+    device: torch.device,
+    class_count: int,
+) -> dict[str, float]:
+    model.eval()
+    predictions = []
+    targets = []
+    for images, batch_targets in loader:
+        predictions.extend(
+            {key: value.cpu() for key, value in prediction.items()}
+            for prediction in model([image.to(device) for image in images])
+        )
+        targets.extend(
+            {key: value.cpu() for key, value in target.items()}
+            for target in batch_targets
+        )
+    class_metrics = evaluate_detections(
+        predictions,
+        targets,
+        class_count,
+        iou_threshold=0.5,
+        confidence_threshold=0.05,
+    )
+    macro_ap = sum(metric.average_precision for metric in class_metrics) / max(
+        len(class_metrics),
+        1,
+    )
+    macro_recall = sum(metric.recall for metric in class_metrics) / max(
+        len(class_metrics),
+        1,
+    )
+    return {
+        "validation_macro_ap50": macro_ap,
+        "validation_macro_recall50": macro_recall,
+    }
+
+
+def _save_best_model(
+    output_dir: Path,
+    epoch: int,
+    student: nn.Module,
+    config: ExperimentConfig,
+    validation: dict[str, float],
+) -> None:
+    torch.save(
+        {
+            "model": student.state_dict(),
+            "class_names": config.data.class_names,
+            "config": config.raw,
+            "model_spec": mobile_model_spec(config.data.image_size),
+            "epoch": epoch,
+            **validation,
+        },
+        output_dir / "student_best.pt",
     )
 
 
@@ -290,7 +442,11 @@ def _fit_teacher_calibration(
     manifest = config.data.target_val
     if not manifest.is_file() or not manifest.read_text(encoding="utf-8").strip():
         return
-    dataset = YoloDetectionDataset(manifest, config.data.class_names)
+    dataset = YoloDetectionDataset(
+        manifest,
+        config.data.class_names,
+        image_size=config.data.image_size if config.data.letterbox else None,
+    )
     loader = DataLoader(
         dataset,
         batch_size=config.training.batch_size,

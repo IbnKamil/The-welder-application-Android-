@@ -30,7 +30,11 @@ def evaluate_checkpoint(
     if manifest is None:
         raise ValueError("Split must be source_val, source_test, val, or test")
     device = torch.device(device_name or ("cuda" if torch.cuda.is_available() else "cpu"))
-    dataset = YoloDetectionDataset(manifest, config.data.class_names)
+    dataset = YoloDetectionDataset(
+        manifest,
+        config.data.class_names,
+        image_size=config.data.image_size if config.data.letterbox else None,
+    )
     loader = DataLoader(
         dataset,
         batch_size=config.training.batch_size,

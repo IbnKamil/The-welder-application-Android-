@@ -1,12 +1,12 @@
 experiment:
-  name: lohi_sequence_safe_baseline
+  name: lohi_official_fold0_control
   seed: 42
-  output_dir: outputs/lohi_baseline
+  output_dir: outputs/lohi_official_control
 
 data:
-  source_train: data/manifests/source_train.txt
-  source_val: data/manifests/source_val.txt
-  source_test: data/manifests/source_test.txt
+  source_train: data/manifests/source_official_train.txt
+  source_val: data/manifests/source_official_val.txt
+  source_test: data/manifests/source_official_test.txt
   target_unlabeled: data/manifests/target_unlabeled.txt
   target_val: data/manifests/target_val.txt
   target_test: data/manifests/target_test.txt
@@ -16,24 +16,17 @@ data:
     - discontinuity
     - stain
   image_size: 640
-  letterbox: false
+  letterbox: true
   group_manifest: data/manifests/groups.csv
 
 model:
   student: ssdlite320_mobilenet_v3_large
   pretrained_backbone: true
-  quality_classes:
-    - acceptable
-    - blur
-    - underexposed
-    - overexposed
-    - glare
-    - seam_too_small
 
 training:
   source_epochs: 50
   adaptation_epochs: 0
-  batch_size: 8
+  batch_size: 4
   workers: 2
   learning_rate: 0.0005
   weight_decay: 0.0001
@@ -42,14 +35,13 @@ training:
   pseudo_threshold: 0.65
   quality_threshold_strength: 0.25
   checkpoint_every: 1
-  balanced_sampling: false
-  photometric_augmentation: false
-  validation_every: 1
+  balanced_sampling: true
+  photometric_augmentation: true
+  validation_every: 5
   scheduler_eta_min: 0.000001
 
 calibration:
   initial_temperature: 1.0
-  target_coverage: 0.85
 
 evaluation:
   iou_thresholds: [0.5, 0.75]

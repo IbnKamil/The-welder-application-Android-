@@ -9,6 +9,7 @@ from weldvision.data import (
     YoloDetectionDataset,
     exact_duplicate_report,
     group_split,
+    letterbox_image_and_boxes,
 )
 from weldvision.metrics import (
     box_iou,
@@ -52,6 +53,17 @@ def test_yolo_boxes_are_converted_to_pixels(tmp_path: Path) -> None:
     _, target = YoloDetectionDataset(manifest, ["pore"])[0]
     assert target["labels"].tolist() == [1]
     assert target["boxes"][0].tolist() == pytest.approx([40.0, 15.0, 60.0, 35.0])
+
+
+def test_letterbox_preserves_aspect_ratio_and_transforms_boxes() -> None:
+    image = Image.new("RGB", (100, 50), "gray")
+    padded, boxes = letterbox_image_and_boxes(
+        image,
+        [[40.0, 15.0, 60.0, 35.0]],
+        200,
+    )
+    assert padded.size == (200, 200)
+    assert boxes[0] == pytest.approx([80.0, 80.0, 120.0, 120.0])
 
 
 def test_quality_rejects_flat_dark_frame() -> None:

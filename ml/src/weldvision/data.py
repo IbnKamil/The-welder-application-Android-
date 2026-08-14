@@ -3,12 +3,13 @@ from __future__ import annotations
 import csv
 import hashlib
 import random
+from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 import torch
-from PIL import Image, ImageEnhance, ImageFilter
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 from torch import Tensor
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import pil_to_tensor
@@ -127,10 +128,14 @@ class YoloDetectionDataset(Dataset):
         manifest: str | Path,
         class_names: Sequence[str],
         transform: Callable[[Image.Image], Tensor] | None = None,
+        image_size: int | None = None,
+        photometric_augmentation: bool = False,
     ) -> None:
         self.images = read_image_manifest(manifest)
         self.class_names = tuple(class_names)
         self.transform = transform or image_to_tensor
+        self.image_size = image_size
+        self.photometric_augmentation = photometric_augmentation
 
     def __len__(self) -> int:
         return len(self.images)
@@ -140,14 +145,17 @@ class YoloDetectionDataset(Dataset):
         with Image.open(image_path) as source:
             image = source.convert("RGB")
             width, height = image.size
-            tensor = self.transform(image)
-
         boxes, labels = _read_yolo_labels(
             _find_label_file(image_path),
             width,
             height,
             len(self.class_names),
         )
+        if self.photometric_augmentation:
+            image = strong_photometric_augmentation(image, random.randrange(2**31))
+        if self.image_size is not None:
+            image, boxes = letterbox_image_and_boxes(image, boxes, self.image_size)
+        tensor = self.transform(image)
         target = {
             "boxes": torch.tensor(boxes, dtype=torch.float32).reshape(-1, 4),
             "labels": torch.tensor(labels, dtype=torch.int64),
@@ -159,9 +167,15 @@ class YoloDetectionDataset(Dataset):
 class UnlabeledImageDataset(Dataset):
     """Return weak/strong photometric views of target-domain smartphone images."""
 
-    def __init__(self, manifest: str | Path, seed: int = 42) -> None:
+    def __init__(
+        self,
+        manifest: str | Path,
+        seed: int = 42,
+        image_size: int | None = None,
+    ) -> None:
         self.images = read_image_manifest(manifest)
         self.seed = seed
+        self.image_size = image_size
 
     def __len__(self) -> int:
         return len(self.images)
@@ -169,8 +183,12 @@ class UnlabeledImageDataset(Dataset):
     def __getitem__(self, index: int) -> tuple[Tensor, Tensor, str]:
         with Image.open(self.images[index]) as source:
             image = source.convert("RGB")
+            strong_image = strong_photometric_augmentation(image, self.seed + index)
+            if self.image_size is not None:
+                image, _ = letterbox_image_and_boxes(image, [], self.image_size)
+                strong_image, _ = letterbox_image_and_boxes(strong_image, [], self.image_size)
             weak = image_to_tensor(image)
-            strong = image_to_tensor(strong_photometric_augmentation(image, self.seed + index))
+            strong = image_to_tensor(strong_image)
         return weak, strong, str(self.images[index])
 
 
@@ -186,6 +204,66 @@ def strong_photometric_augmentation(image: Image.Image, seed: int) -> Image.Imag
     if rng.random() < 0.35:
         result = result.filter(ImageFilter.GaussianBlur(radius=rng.uniform(0.3, 1.6)))
     return result
+
+
+def letterbox_image_and_boxes(
+    image: Image.Image,
+    boxes: Sequence[Sequence[float]],
+    size: int,
+    fill: tuple[int, int, int] = (114, 114, 114),
+) -> tuple[Image.Image, list[list[float]]]:
+    """Resize without geometric distortion and transform xyxy boxes."""
+    if size <= 0:
+        raise ValueError("Letterbox size must be positive")
+    width, height = image.size
+    scale = min(size / width, size / height)
+    resized_width = max(1, round(width * scale))
+    resized_height = max(1, round(height * scale))
+    resized = image.resize((resized_width, resized_height), Image.Resampling.BILINEAR)
+    pad_left = (size - resized_width) // 2
+    pad_top = (size - resized_height) // 2
+    pad_right = size - resized_width - pad_left
+    pad_bottom = size - resized_height - pad_top
+    padded = ImageOps.expand(
+        resized,
+        border=(pad_left, pad_top, pad_right, pad_bottom),
+        fill=fill,
+    )
+    transformed = [
+        [
+            box[0] * scale + pad_left,
+            box[1] * scale + pad_top,
+            box[2] * scale + pad_left,
+            box[3] * scale + pad_top,
+        ]
+        for box in boxes
+    ]
+    return padded, transformed
+
+
+def balanced_sample_weights(dataset: YoloDetectionDataset) -> Tensor:
+    """Weight multi-label images by inverse square-root class frequency."""
+    image_classes = []
+    frequency: Counter[int] = Counter()
+    for image_path in dataset.images:
+        classes = {
+            int(line.split()[0])
+            for line in _find_label_file(image_path).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+        image_classes.append(classes)
+        frequency.update(classes)
+    weights = []
+    for classes in image_classes:
+        if not classes:
+            weights.append(1.0)
+            continue
+        weights.append(
+            sum(1.0 / max(frequency[class_id], 1) ** 0.5 for class_id in classes)
+            / len(classes)
+        )
+    tensor = torch.tensor(weights, dtype=torch.double)
+    return tensor / tensor.mean().clamp_min(1e-12)
 
 
 def detection_collate(

@@ -1,7 +1,7 @@
 experiment:
-  name: lohi_sequence_safe_baseline
+  name: lohi_sequence_safe_baseline_b1
   seed: 42
-  output_dir: outputs/lohi_baseline
+  output_dir: outputs/lohi_baseline_b1
 
 data:
   source_train: data/manifests/source_train.txt
@@ -16,7 +16,7 @@ data:
     - discontinuity
     - stain
   image_size: 640
-  letterbox: false
+  letterbox: true
   group_manifest: data/manifests/groups.csv
 
 model:
@@ -33,7 +33,7 @@ model:
 training:
   source_epochs: 50
   adaptation_epochs: 0
-  batch_size: 8
+  batch_size: 4
   workers: 2
   learning_rate: 0.0005
   weight_decay: 0.0001
@@ -42,9 +42,9 @@ training:
   pseudo_threshold: 0.65
   quality_threshold_strength: 0.25
   checkpoint_every: 1
-  balanced_sampling: false
-  photometric_augmentation: false
-  validation_every: 1
+  balanced_sampling: true
+  photometric_augmentation: true
+  validation_every: 5
   scheduler_eta_min: 0.000001
 
 calibration:
