@@ -264,8 +264,7 @@ def balanced_sample_weights(dataset: YoloDetectionDataset) -> Tensor:
         )
     tensor = torch.tensor(weights, dtype=torch.double)
     normalized = tensor / tensor.mean().clamp_min(1e-12)
-    capped = normalized.clamp(max=5.0)
-    return capped / capped.mean().clamp_min(1e-12)
+    return normalized.clamp(max=5.0)
 
 
 def detection_collate(
