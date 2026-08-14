@@ -5,7 +5,7 @@ import torch
 import yaml
 from PIL import Image
 
-from weldvision.config import generate_b0_factor_ablations
+from weldvision.config import generate_b0_factor_ablations, load_config
 from weldvision.data import (
     ManifestRow,
     YoloDetectionDataset,
@@ -192,3 +192,8 @@ def test_ablation_generator_changes_one_named_factor(tmp_path: Path) -> None:
     assert letterbox["training"]["balanced_sampling"] is False
     assert balanced["data"]["letterbox"] is False
     assert balanced["training"]["balanced_sampling"] is True
+    loaded = load_config(paths[0])
+    assert loaded.project_root == Path(__file__).parents[1]
+    assert loaded.data.source_train == (
+        Path(__file__).parents[1] / "data/manifests/source_train.txt"
+    )

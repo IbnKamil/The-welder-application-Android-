@@ -63,7 +63,11 @@ def load_config(path: str | Path) -> ExperimentConfig:
     if not isinstance(raw, dict):
         raise TypeError("The configuration root must be a mapping")
 
-    root = config_path.parent.parent
+    root = (
+        Path(raw["project_root"]).expanduser().resolve()
+        if raw.get("project_root")
+        else _find_project_root(config_path.parent)
+    )
     data = raw["data"]
     training = raw["training"]
     experiment = raw["experiment"]
@@ -119,6 +123,15 @@ def _resolve(root: Path, value: str) -> Path:
     return path if path.is_absolute() else (root / path).resolve()
 
 
+def _find_project_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (candidate / "pyproject.toml").is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"Unable to locate pyproject.toml above configuration directory: {start}"
+    )
+
+
 def generate_b0_factor_ablations(
     base_path: str | Path,
     output_directory: str | Path,
@@ -143,6 +156,7 @@ def generate_b0_factor_ablations(
         config = copy.deepcopy(source)
         config["experiment"]["name"] = name
         config["experiment"]["output_dir"] = str(result_root / name)
+        config["project_root"] = str(base.parent.parent)
         config["training"]["validation_every"] = 5
         for keys, value in overrides.items():
             current = config
