@@ -21,7 +21,7 @@ def create_mobile_detector(
         weights=None,
         weights_backbone=backbone_weights,
         num_classes=defect_class_count + 1,
-        trainable_backbone_layers=6,
+        trainable_backbone_layers=6 if pretrained_backbone else None,
     )
 
 

@@ -11,6 +11,7 @@ from weldvision.data import (
     group_split,
 )
 from weldvision.metrics import box_iou, evaluate_detections, expected_calibration_error
+from weldvision.model import create_mobile_detector
 from weldvision.pseudo import ScoreTemperature, select_pseudo_targets
 from weldvision.quality import heuristic_quality
 
@@ -102,3 +103,26 @@ def test_detection_metrics_match_by_class_and_iou() -> None:
     metrics = evaluate_detections([prediction], [target], 1)
     assert metrics[0].recall == 1.0
     assert metrics[0].precision == 0.5
+
+
+def test_mobile_detector_training_and_inference_contract() -> None:
+    model = create_mobile_detector(4, pretrained_backbone=False)
+    images = [torch.rand(3, 320, 320), torch.rand(3, 320, 320)]
+    targets = [
+        {
+            "boxes": torch.tensor([[30.0, 40.0, 120.0, 150.0]]),
+            "labels": torch.tensor([1]),
+        },
+        {
+            "boxes": torch.tensor([[50.0, 60.0, 160.0, 180.0]]),
+            "labels": torch.tensor([2]),
+        },
+    ]
+    model.train()
+    losses = model(images, targets)
+    assert losses
+    assert all(torch.isfinite(value) for value in losses.values())
+    model.eval()
+    with torch.no_grad():
+        outputs = model(images[:1])
+    assert {"boxes", "labels", "scores"} <= outputs[0].keys()
