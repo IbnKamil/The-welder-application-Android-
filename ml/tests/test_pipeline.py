@@ -16,7 +16,7 @@ from weldvision.metrics import (
     evaluate_detections,
     expected_calibration_error,
 )
-from weldvision.model import create_mobile_detector
+from weldvision.model import create_mobile_detector, restore_mobile_detector
 from weldvision.pseudo import ScoreTemperature, select_pseudo_targets
 from weldvision.quality import heuristic_quality
 
@@ -134,3 +134,13 @@ def test_mobile_detector_training_and_inference_contract() -> None:
     with torch.no_grad():
         outputs = model(images[:1])
     assert {"boxes", "labels", "scores"} <= outputs[0].keys()
+
+    restored = restore_mobile_detector(
+        {"model": model.state_dict()},
+        defect_class_count=4,
+        image_size=320,
+    )
+    assert (
+        restored.state_dict()["backbone.features.1.0.3.0.weight"].shape
+        == model.state_dict()["backbone.features.1.0.3.0.weight"].shape
+    )

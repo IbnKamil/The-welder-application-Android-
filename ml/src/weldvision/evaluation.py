@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from weldvision.config import ExperimentConfig
 from weldvision.data import YoloDetectionDataset, detection_collate
 from weldvision.metrics import evaluate_detections
-from weldvision.model import create_mobile_detector, move_targets
+from weldvision.model import move_targets, restore_mobile_detector
 
 
 @torch.no_grad()
@@ -38,16 +38,12 @@ def evaluate_checkpoint(
         num_workers=config.training.workers,
         collate_fn=detection_collate,
     )
-    model = create_mobile_detector(
-        len(config.data.class_names),
-        pretrained_backbone=False,
-        image_size=config.data.image_size,
-    ).to(device)
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    state = checkpoint.get("model") or checkpoint.get("student")
-    if state is None:
-        raise ValueError("Checkpoint contains neither model nor student weights")
-    model.load_state_dict(state)
+    model = restore_mobile_detector(
+        checkpoint,
+        len(config.data.class_names),
+        config.data.image_size,
+    ).to(device)
     model.eval()
 
     predictions = []

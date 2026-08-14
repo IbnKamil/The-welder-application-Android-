@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Mapping
+from typing import Any
 
 import torch
 from torch import nn
@@ -30,6 +32,49 @@ def create_mobile_detector(
     model.transform.min_size = (image_size,)
     model.transform.max_size = image_size
     return model
+
+
+def restore_mobile_detector(
+    checkpoint: Mapping[str, Any],
+    defect_class_count: int,
+    image_size: int,
+) -> nn.Module:
+    """Rebuild the exact SSDLite tail variant used by an existing checkpoint."""
+    state = checkpoint.get("model")
+    if state is None:
+        state = checkpoint.get("student")
+    if state is None:
+        raise ValueError("Checkpoint contains neither model nor student weights")
+
+    specification = checkpoint.get("model_spec", {})
+    if "pretrained_backbone" in specification:
+        pretrained_backbone = bool(specification["pretrained_backbone"])
+    else:
+        pretrained_backbone = _infer_full_tail(state)
+
+    model = create_mobile_detector(
+        defect_class_count,
+        pretrained_backbone=pretrained_backbone,
+        image_size=int(specification.get("image_size", image_size)),
+    )
+    model.load_state_dict(state)
+    return model
+
+
+def mobile_model_spec(image_size: int, pretrained_backbone: bool = True) -> dict[str, Any]:
+    return {
+        "architecture": "ssdlite320_mobilenet_v3_large",
+        "image_size": image_size,
+        "pretrained_backbone": pretrained_backbone,
+        "tail": "full" if pretrained_backbone else "reduced",
+    }
+
+
+def _infer_full_tail(state: Mapping[str, torch.Tensor]) -> bool:
+    probe = state.get("backbone.features.1.0.3.0.weight")
+    if probe is None:
+        raise ValueError("Unable to infer SSDLite backbone variant from legacy checkpoint")
+    return int(probe.shape[0]) >= 160
 
 
 def create_ema_teacher(student: nn.Module) -> nn.Module:

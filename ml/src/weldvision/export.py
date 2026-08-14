@@ -7,7 +7,7 @@ import torch
 from torch import Tensor, nn
 
 from weldvision.config import ExperimentConfig
-from weldvision.model import create_mobile_detector
+from weldvision.model import restore_mobile_detector
 
 
 class DetectorExportWrapper(nn.Module):
@@ -31,16 +31,12 @@ def export_onnx(
 ) -> Path:
     """Export FP32 ONNX. INT8 conversion requires target-device calibration afterwards."""
     device = torch.device("cpu")
-    model = create_mobile_detector(
-        len(config.data.class_names),
-        pretrained_backbone=False,
-        image_size=config.data.image_size,
-    )
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    state = checkpoint.get("model") or checkpoint.get("student")
-    if state is None:
-        raise ValueError("Checkpoint contains neither model nor student weights")
-    model.load_state_dict(state)
+    model = restore_mobile_detector(
+        checkpoint,
+        len(config.data.class_names),
+        config.data.image_size,
+    )
     model.eval()
     wrapper = DetectorExportWrapper(model)
     output = Path(output_path)

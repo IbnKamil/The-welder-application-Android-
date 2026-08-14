@@ -23,6 +23,7 @@ from weldvision.metrics import detection_calibration_pairs
 from weldvision.model import (
     create_ema_teacher,
     create_mobile_detector,
+    mobile_model_spec,
     move_targets,
     update_ema_teacher,
 )
@@ -197,6 +198,7 @@ def run_training(
                 "model": student.state_dict(),
                 "class_names": config.data.class_names,
                 "config": config.raw,
+                "model_spec": mobile_model_spec(config.data.image_size),
             },
             final_path,
         )
@@ -237,6 +239,7 @@ def run_training(
             "model": student.state_dict(),
             "class_names": config.data.class_names,
             "config": config.raw,
+            "model_spec": mobile_model_spec(config.data.image_size),
         },
         final_path,
     )
@@ -262,6 +265,7 @@ def _save_checkpoint(
             "teacher": teacher.state_dict(),
             "optimizer": optimizer.state_dict(),
             "config": config.raw,
+            "model_spec": mobile_model_spec(config.data.image_size),
         },
         output_dir / "last.pt",
     )
