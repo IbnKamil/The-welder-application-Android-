@@ -26,6 +26,9 @@ export = [
     "onnx>=1.17",
     "onnxruntime>=1.20",
 ]
+data = [
+    "gdown>=6.1",
+]
 
 [project.scripts]
 weldvision = "weldvision.cli:main"

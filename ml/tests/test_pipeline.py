@@ -45,7 +45,7 @@ def test_yolo_boxes_are_converted_to_pixels(tmp_path: Path) -> None:
     label_dir.mkdir()
     image_path = image_dir / "sample.jpg"
     Image.new("RGB", (100, 50), "gray").save(image_path)
-    (label_dir / "sample.txt").write_text("0 0.5 0.5 0.2 0.4\n", encoding="utf-8")
+    (label_dir / "sample.yolo").write_text("0 0.5 0.5 0.2 0.4\n", encoding="utf-8")
     manifest = tmp_path / "train.txt"
     manifest.write_text(f"{image_path}\n", encoding="utf-8")
 

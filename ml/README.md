@@ -86,6 +86,47 @@ weldvision --help
 атрибуцию каждого набора. Рентгеновские изображения нельзя смешивать с RGB как
 обычные обучающие примеры: это физически другая модальность.
 
+### Автоматическая подготовка LoHi-WELD
+
+Установите data-зависимость и скачайте официальный архив:
+
+```bash
+pip install -e ".[data]"
+python -m gdown \
+  "https://drive.google.com/uc?id=1pXeEnREfV_MYcL5MY2vkd9njBm_blPUK" \
+  -O data/raw/lohi-weld.zip
+```
+
+Проверка архива, 3022 пар изображений/аннотаций, диапазонов YOLO-координат,
+классов, точных дубликатов и создание manifests:
+
+```bash
+weldvision prepare-lohi \
+  --archive data/raw/lohi-weld.zip \
+  --destination data/raw/lohi \
+  --manifests data/manifests \
+  --fold 0 \
+  --seed 42
+```
+
+Отчёт записывается в `data/manifests/lohi_audit.json`. Ожидаемые значения:
+
+```text
+high: 1022 изображения
+low: 2000 изображений
+pore: 3950
+deposit: 2935
+discontinuity: 7220
+stain: 8307
+```
+
+Опубликованные folds LoHi воспроизводятся в `source_official_*.txt`, но созданы
+случайным разбиением отдельных изображений. Это может помещать кадры одной
+производственной серии в train и test. Поэтому основные диссертационные эксперименты
+используют `source_train.txt`, `source_val.txt`, `source_test.txt`, где группы
+формируются по префиксу серии. Официальный split сохраняется только для честного
+сравнения с опубликованным baseline.
+
 ### Структура
 
 ```text

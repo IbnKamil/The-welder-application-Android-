@@ -147,7 +147,6 @@ def run_training(
         config.data.source_train,
         config.data.class_names,
     )
-    target_dataset = UnlabeledImageDataset(config.data.target_unlabeled, config.seed)
     source_loader = DataLoader(
         source_dataset,
         batch_size=config.training.batch_size,
@@ -155,14 +154,6 @@ def run_training(
         num_workers=config.training.workers,
         collate_fn=detection_collate,
     )
-    target_loader = DataLoader(
-        target_dataset,
-        batch_size=config.training.batch_size,
-        shuffle=True,
-        num_workers=config.training.workers,
-        collate_fn=unlabeled_collate,
-    )
-
     student = create_mobile_detector(
         len(config.data.class_names),
         image_size=config.data.image_size,
@@ -198,6 +189,29 @@ def run_training(
         start_epoch = 0
 
     _fit_teacher_calibration(config, teacher, calibrator, device)
+
+    if config.training.adaptation_epochs <= 0:
+        final_path = output_dir / "student_final.pt"
+        torch.save(
+            {
+                "model": student.state_dict(),
+                "class_names": config.data.class_names,
+                "config": config.raw,
+            },
+            final_path,
+        )
+        return final_path
+
+    target_dataset = UnlabeledImageDataset(config.data.target_unlabeled, config.seed)
+    if not len(target_dataset):
+        raise ValueError("Target unlabeled manifest is empty; adaptation cannot start")
+    target_loader = DataLoader(
+        target_dataset,
+        batch_size=config.training.batch_size,
+        shuffle=True,
+        num_workers=config.training.workers,
+        collate_fn=unlabeled_collate,
+    )
 
     for epoch in range(start_epoch, config.training.adaptation_epochs):
         metrics = adapt_epoch(

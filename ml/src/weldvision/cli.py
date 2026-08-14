@@ -12,6 +12,7 @@ from weldvision.data import (
 )
 from weldvision.evaluation import evaluate_checkpoint
 from weldvision.export import export_onnx
+from weldvision.lohi import prepare_lohi
 from weldvision.quality_training import train_quality_gate
 from weldvision.trainer import run_training
 
@@ -28,6 +29,16 @@ def main() -> None:
     audit_parser = subparsers.add_parser("audit", help="Audit group and exact duplicate leakage")
     audit_parser.add_argument("--manifest", required=True)
     audit_parser.add_argument("--seed", type=int, default=42)
+
+    lohi_parser = subparsers.add_parser(
+        "prepare-lohi",
+        help="Extract, validate, and create LoHi-WELD manifests",
+    )
+    lohi_parser.add_argument("--archive", required=True)
+    lohi_parser.add_argument("--destination", required=True)
+    lohi_parser.add_argument("--manifests", required=True)
+    lohi_parser.add_argument("--fold", type=int, default=0)
+    lohi_parser.add_argument("--seed", type=int, default=42)
 
     train_parser = subparsers.add_parser("train", help="Train source baseline and adaptation")
     train_parser.add_argument("--config", required=True)
@@ -60,6 +71,15 @@ def main() -> None:
         _split(args.manifest, args.output, args.seed)
     elif args.command == "audit":
         _audit(args.manifest, args.seed)
+    elif args.command == "prepare-lohi":
+        report = prepare_lohi(
+            args.archive,
+            args.destination,
+            args.manifests,
+            fold=args.fold,
+            seed=args.seed,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
     elif args.command == "train":
         path = run_training(
             load_config(args.config),

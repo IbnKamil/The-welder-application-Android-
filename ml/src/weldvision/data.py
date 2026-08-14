@@ -203,14 +203,20 @@ def unlabeled_collate(
 
 
 def _find_label_file(image_path: Path) -> Path:
-    candidates = [image_path.with_suffix(".txt")]
+    candidates = [image_path.with_suffix(".txt"), image_path.with_suffix(".yolo")]
     parts = list(image_path.parts)
     if "images" in parts:
         image_index = len(parts) - 1 - parts[::-1].index("images")
         replaced = parts.copy()
         replaced[image_index] = "labels"
         candidates.insert(0, Path(*replaced).with_suffix(".txt"))
-    candidates.append(image_path.parent.parent / "labels" / f"{image_path.stem}.txt")
+        candidates.insert(1, Path(*replaced).with_suffix(".yolo"))
+    candidates.extend(
+        [
+            image_path.parent.parent / "labels" / f"{image_path.stem}.txt",
+            image_path.parent.parent / "labels" / f"{image_path.stem}.yolo",
+        ]
+    )
     for candidate in candidates:
         if candidate.is_file():
             return candidate
