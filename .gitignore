@@ -12,6 +12,6 @@ __pycache__/
 *.py[cod]
 ml/data/
 ml/outputs/
-ml/*.egg-info/
+ml/**/*.egg-info/
 ml/**/*.pt
 ml/**/*.onnx
