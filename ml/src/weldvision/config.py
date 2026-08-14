@@ -11,6 +11,7 @@ import yaml
 class DataConfig:
     source_train: Path
     source_val: Path
+    source_test: Path
     target_unlabeled: Path
     target_val: Path
     target_test: Path
@@ -62,6 +63,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
     data_config = DataConfig(
         source_train=_resolve(root, data["source_train"]),
         source_val=_resolve(root, data["source_val"]),
+        source_test=_resolve(root, data["source_test"]),
         target_unlabeled=_resolve(root, data["target_unlabeled"]),
         target_val=_resolve(root, data["target_val"]),
         target_test=_resolve(root, data["target_test"]),

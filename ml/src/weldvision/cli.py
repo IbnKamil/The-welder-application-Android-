@@ -67,7 +67,11 @@ def main() -> None:
     evaluate_parser = subparsers.add_parser("evaluate", help="Evaluate a checkpoint")
     evaluate_parser.add_argument("--config", required=True)
     evaluate_parser.add_argument("--checkpoint", required=True)
-    evaluate_parser.add_argument("--split", choices=["source_val", "val", "test"], default="test")
+    evaluate_parser.add_argument(
+        "--split",
+        choices=["source_val", "source_test", "val", "test"],
+        default="test",
+    )
     evaluate_parser.add_argument("--device")
 
     export_parser = subparsers.add_parser("export", help="Export a validated student to ONNX")

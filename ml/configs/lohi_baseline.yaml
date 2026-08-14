@@ -1,7 +1,7 @@
 experiment:
-  name: lohi_to_mobile_quality_aware
+  name: lohi_sequence_safe_baseline
   seed: 42
-  output_dir: outputs/lohi_to_mobile
+  output_dir: outputs/lohi_baseline
 
 data:
   source_train: data/manifests/source_train.txt
@@ -28,16 +28,15 @@ model:
     - overexposed
     - glare
     - seam_too_small
-  quality_checkpoint: outputs/quality/gate.pt
 
 training:
-  source_epochs: 30
-  adaptation_epochs: 30
+  source_epochs: 50
+  adaptation_epochs: 0
   batch_size: 8
   workers: 2
   learning_rate: 0.0005
   weight_decay: 0.0001
-  unsupervised_weight: 0.5
+  unsupervised_weight: 0.0
   ema_decay: 0.999
   pseudo_threshold: 0.65
   quality_threshold_strength: 0.25

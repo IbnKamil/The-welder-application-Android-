@@ -23,11 +23,12 @@ def evaluate_checkpoint(
 ) -> dict[str, object]:
     manifest = {
         "source_val": config.data.source_val,
+        "source_test": config.data.source_test,
         "val": config.data.target_val,
         "test": config.data.target_test,
     }.get(split)
     if manifest is None:
-        raise ValueError("Split must be source_val, val, or test")
+        raise ValueError("Split must be source_val, source_test, val, or test")
     device = torch.device(device_name or ("cuda" if torch.cuda.is_available() else "cpu"))
     dataset = YoloDetectionDataset(manifest, config.data.class_names)
     loader = DataLoader(

@@ -212,7 +212,27 @@ weldvision audit --manifest data/manifests/groups.csv --seed 42
 
 ## Обучение
 
-Настройте `configs/lohi_to_mobile.yaml`, затем:
+Сначала обучите воспроизводимый source-only baseline. Он не требует smartphone
+target и служит контрольной точкой диссертации:
+
+```bash
+weldvision train \
+  --config configs/lohi_baseline.yaml \
+  --device cuda
+
+weldvision evaluate \
+  --config configs/lohi_baseline.yaml \
+  --checkpoint outputs/lohi_baseline/student_final.pt \
+  --split source_test \
+  --device cuda
+```
+
+Не подбирайте параметры по `source_test`: используйте `source_val`, а test запускайте
+после фиксации конфигурации. Для доверительных интервалов повторите baseline с seeds
+из конфигурации.
+
+После появления собственного smartphone target настройте
+`configs/lohi_to_mobile.yaml`, затем:
 
 ```bash
 weldvision train --config configs/lohi_to_mobile.yaml --device cuda
