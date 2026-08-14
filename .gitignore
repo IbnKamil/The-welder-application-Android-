@@ -7,3 +7,11 @@ captures/
 .externalNativeBuild/
 .cxx/
 app/build/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+ml/data/
+ml/outputs/
+ml/*.egg-info/
+ml/**/*.pt
+ml/**/*.onnx

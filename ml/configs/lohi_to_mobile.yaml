@@ -1,0 +1,57 @@
+experiment:
+  name: lohi_to_mobile_quality_aware
+  seed: 42
+  output_dir: outputs/lohi_to_mobile
+
+data:
+  source_train: data/manifests/source_train.txt
+  source_val: data/manifests/source_val.txt
+  target_unlabeled: data/manifests/target_unlabeled.txt
+  target_val: data/manifests/target_val.txt
+  target_test: data/manifests/target_test.txt
+  class_names:
+    - pore
+    - deposit
+    - discontinuity
+    - stain
+  image_size: 640
+  group_manifest: data/manifests/groups.csv
+
+model:
+  student: ssdlite320_mobilenet_v3_large
+  pretrained_backbone: true
+  quality_classes:
+    - acceptable
+    - blur
+    - underexposed
+    - overexposed
+    - glare
+    - seam_too_small
+
+training:
+  source_epochs: 30
+  adaptation_epochs: 30
+  batch_size: 8
+  workers: 2
+  learning_rate: 0.0005
+  weight_decay: 0.0001
+  unsupervised_weight: 0.5
+  ema_decay: 0.999
+  pseudo_threshold: 0.65
+  quality_threshold_strength: 0.25
+  checkpoint_every: 1
+
+calibration:
+  initial_temperature: 1.0
+  target_coverage: 0.85
+
+evaluation:
+  iou_thresholds: [0.5, 0.75]
+  confidence_threshold: 0.25
+  bootstrap_samples: 1000
+  random_seeds: [17, 42, 73]
+
+export:
+  format: onnx
+  opset: 18
+  quantization: int8

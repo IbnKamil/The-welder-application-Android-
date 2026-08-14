@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "svarshik-weldvision"
+version = "0.1.0"
+description = "Quality-aware domain adaptation for mobile weld defect detection"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=2.0",
+    "Pillow>=11.0",
+    "PyYAML>=6.0",
+    "scikit-learn>=1.6",
+    "torch>=2.5",
+    "torchvision>=0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.9",
+]
+export = [
+    "onnx>=1.17",
+    "onnxruntime>=1.20",
+]
+
+[project.scripts]
+weldvision = "weldvision.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
