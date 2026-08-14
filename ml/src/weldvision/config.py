@@ -51,7 +51,7 @@ def load_config(path: str | Path) -> ExperimentConfig:
         raw = yaml.safe_load(stream)
 
     if not isinstance(raw, dict):
-        raise ValueError("The configuration root must be a mapping")
+        raise TypeError("The configuration root must be a mapping")
 
     root = config_path.parent.parent
     data = raw["data"]

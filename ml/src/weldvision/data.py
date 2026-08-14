@@ -3,9 +3,9 @@ from __future__ import annotations
 import csv
 import hashlib
 import random
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
 
 import torch
 from PIL import Image, ImageEnhance, ImageFilter
