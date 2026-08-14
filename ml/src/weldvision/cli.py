@@ -14,6 +14,7 @@ from weldvision.evaluation import evaluate_checkpoint
 from weldvision.export import export_onnx
 from weldvision.lohi import prepare_lohi
 from weldvision.quality_training import train_quality_gate
+from weldvision.rgb_challenge import prepare_rgb_challenge
 from weldvision.trainer import run_training
 
 
@@ -39,6 +40,14 @@ def main() -> None:
     lohi_parser.add_argument("--manifests", required=True)
     lohi_parser.add_argument("--fold", type=int, default=0)
     lohi_parser.add_argument("--seed", type=int, default=42)
+
+    rgb_parser = subparsers.add_parser(
+        "prepare-rgb-challenge",
+        help="Prepare the small external RGB weld challenge set",
+    )
+    rgb_parser.add_argument("--archive", required=True)
+    rgb_parser.add_argument("--destination", required=True)
+    rgb_parser.add_argument("--manifests", required=True)
 
     train_parser = subparsers.add_parser("train", help="Train source baseline and adaptation")
     train_parser.add_argument("--config", required=True)
@@ -78,6 +87,13 @@ def main() -> None:
             args.manifests,
             fold=args.fold,
             seed=args.seed,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif args.command == "prepare-rgb-challenge":
+        report = prepare_rgb_challenge(
+            args.archive,
+            args.destination,
+            args.manifests,
         )
         print(json.dumps(report, ensure_ascii=False, indent=2))
     elif args.command == "train":

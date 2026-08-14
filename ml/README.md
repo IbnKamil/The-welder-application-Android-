@@ -127,6 +127,28 @@ stain: 8307
 формируются по префиксу серии. Официальный split сохраняется только для честного
 сравнения с опубликованным baseline.
 
+### Малый RGB challenge set
+
+Набор Zenodo `10.5281/zenodo.17402020` имеет CC-BY-4.0, однако его классы
+`slag inclusion/spatter/undercut` несовместимы с таксономией LoHi-WELD. Он не
+добавляется в обычный train/test автоматически.
+
+```bash
+curl -L \
+  "https://zenodo.org/api/records/17402020/files/Final_Dataset_YOLO_Test.zip/content" \
+  -o data/raw/weld-surface-rgb.zip
+
+weldvision prepare-rgb-challenge \
+  --archive data/raw/weld-surface-rgb.zip \
+  --destination data/raw/rgb-challenge \
+  --manifests data/manifests
+```
+
+Аудит сохраняется в `rgb_challenge_audit.json`. Набор используется только как
+внешний robustness challenge либо как unlabeled smoke-test. Нельзя произвольно
+переименовывать `spatter` в `deposit` или `undercut` в `discontinuity`: такое
+сопоставление должен утвердить эксперт и отдельный протокол разметки.
+
 ### Структура
 
 ```text
