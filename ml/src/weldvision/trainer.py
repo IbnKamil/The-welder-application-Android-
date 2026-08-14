@@ -428,8 +428,10 @@ def _save_best_model(
 
 
 def _write_metrics(path: Path, phase: str, epoch: int, metrics: dict[str, Any]) -> None:
+    payload = {"phase": phase, "epoch": epoch, **metrics}
     with path.open("a", encoding="utf-8") as stream:
-        stream.write(json.dumps({"phase": phase, "epoch": epoch, **metrics}) + "\n")
+        stream.write(json.dumps(payload) + "\n")
+    print(json.dumps(payload), flush=True)
 
 
 def _repeat(loader: Iterable[Any]) -> Iterable[Any]:
