@@ -1,8 +1,10 @@
 *.iml
 .gradle/
 .idea/
+.kotlin/
 local.properties
 build/
+.venv/
 captures/
 .externalNativeBuild/
 .cxx/
