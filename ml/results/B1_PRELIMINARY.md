@@ -62,4 +62,11 @@ AP75 0.0294. Cosine scheduler не объясняет деградацию B1 и
 Однофакторный A4 (class-balanced sampler) дал test AP50 **0.2807** против B0
 **0.2791**. Recall `pore` вырос с 0.0559 до 0.0748, но recall `stain` упал с
 0.3515 до 0.2480, а macro recall50 снизился до 0.2803. Балансировка не
-принимается как новый baseline. Остаётся A5.
+принимается как новый baseline.
+
+## Последующий результат A5
+
+Однофакторный A5 (photometric augmentation) дал наивысшие в серии test AP50
+**0.2904** и AP75 **0.0366**, но recall `pore` упал до 0.0169, а macro recall50
+до 0.2818. Фактор не заменяет B0. Итог A1–A5: source baseline заморожен как B0
+(`results/ABLATION_SUMMARY.md`).

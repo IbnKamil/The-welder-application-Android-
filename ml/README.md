@@ -235,24 +235,17 @@ weldvision evaluate \
 
 Результат первой контрольной модели B0 зафиксирован в
 [`results/B0_SEQUENCE_SAFE_BASELINE.md`](results/B0_SEQUENCE_SAFE_BASELINE.md).
-Улучшенный B1 устраняет заранее сформулированные недостатки B0:
+Однофакторные ablations A1–A5 не дали конфигурации, которая одновременно
+улучшает AP50 и recall50. Объединённый B1 хуже B0; letterbox (A1) — основной
+отрицательный фактор. Source baseline заморожен как B0, итог в
+[`results/ABLATION_SUMMARY.md`](results/ABLATION_SUMMARY.md).
 
-- letterbox вместо геометрического растягивания;
-- inverse-sqrt class-balanced sampler;
-- smartphone-like photometric augmentation;
-- cosine learning-rate scheduler;
-- validation каждые 5 эпох;
-- сохранение `student_best.pt` по macro AP50.
+Конфигурация B1 сохраняется только как отрицательный комбинированный контроль,
+а не как улучшенный детектор:
 
 ```bash
 weldvision train \
   --config configs/lohi_baseline_b1.yaml \
-  --device cuda
-
-weldvision evaluate \
-  --config configs/lohi_baseline_b1.yaml \
-  --checkpoint outputs/lohi_baseline_b1/student_best.pt \
-  --split source_test \
   --device cuda
 ```
 
@@ -265,8 +258,9 @@ weldvision train \
   --device cuda
 ```
 
-Сначала сравниваются B0 и B1 на одном sequence-safe test. Official-control отвечает
-на отдельный вопрос о влиянии image-level split и не подменяет основной test.
+Сначала сравниваются B0 и однофакторные ablations на одном sequence-safe test.
+Official-control отвечает на отдельный вопрос о влиянии image-level split и не
+подменяет основной test.
 
 После появления собственного smartphone target настройте
 `configs/lohi_to_mobile.yaml`, затем:

@@ -39,7 +39,10 @@ Generated experiments:
 | A2 | best checkpoint selection | no test AP gain (AP50 0.2802) |
 | A3 | cosine scheduler | no clear gain (AP50 0.2862, recall down) |
 | A4 | class-balanced sampler | pore recall up, macro flat (AP50 0.2807) |
-| A5 | photometric augmentation | next |
+| A5 | photometric augmentation | AP50 0.2904 / AP75 up, pore recall down |
+
+Source baseline after A1–A5: **B0**. See `results/ABLATION_SUMMARY.md`.
+Do not treat combined B1 as an improved detector.
 
 Run one experiment at a time. All use the same sequence-safe train/validation/test
 and seed. After screening, promising factors must be repeated with multiple seeds.
