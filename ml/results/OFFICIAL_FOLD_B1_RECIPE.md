@@ -33,9 +33,7 @@ Sequence-safe B0 отличался и split, и рецептом обучени
 Лучшая эпоха ≈ 14. Последняя хуже: модель переобучается. Оценивать нужно
 `student_best.pt`.
 
-## Дальше
+## Test (205 official high-resolution images)
 
-1. Оценить этот прогон на `source_official_test` — как отрицательный контроль
-   «B1-рецепт на official fold».
-2. Обучить изолированный контроль `configs/lohi_official_b0.yaml`: рецепт B0,
-   manifests `source_official_*.txt`.
+Macro AP50 **0.0590**, precision50 0.1443, recall50 0.1142, AP75 0.0019.
+Полное сравнение с official B0 — в `OFFICIAL_FOLD_CONTROL.md`.

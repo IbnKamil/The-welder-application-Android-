@@ -36,9 +36,10 @@ A4 — единственный прирост recall `pore` (0.0559 → 0.0748)
 
 ## Следующие стадии (не source-ablation)
 
-1. Official LoHi fold 0 как **отдельный** контроль протокола разбиения
-   (`configs/lohi_official_b0.yaml`, рецепт B0). Файл
-   `lohi_official_control.yaml` — B1-рецепт, не изолирует split.
+1. Official LoHi fold 0 выполнен. На одном official test рецепт B0 (AP50
+   0.1635) лучше B1 (0.0590). Сравнение с sequence-safe B0 (0.2791) смешано
+   с high-only vs high+low и не интерпретируется как чистый эффект split.
+   Отчёт: `results/OFFICIAL_FOLD_CONTROL.md`.
 2. Подготовка unlabeled smartphone RGB и quality gate.
 3. Адаптация `configs/lohi_to_mobile.yaml` от замороженного B0 student:
    EMA teacher, калибровка, quality-conditioned pseudo-labels.
