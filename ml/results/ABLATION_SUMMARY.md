@@ -34,17 +34,19 @@ A4 — единственный прирост recall `pore` (0.0559 → 0.0748)
 прирост AP75 (0.0304 → 0.0366). Оба эффекта сопровождаются потерей другого
 класса или общего recall, поэтому в baseline не входят.
 
+SSDLite B0 остаётся слабым контролем. Рабочий source для адаптации —
+YOLOv8s на том же split (`results/YOLOV8S_SEQUENCE_SAFE.md`): test AP50
+**0.5710**, pore recall **0.4928**. Порог AP50 ≥ 0.50 и pore recall ≥ 0.25
+взят. Веса AGPL, только диссертация.
+
 ## Следующие стадии (не source-ablation)
 
 1. Official LoHi fold 0 выполнен. На одном official test рецепт B0 (AP50
    0.1635) лучше B1 (0.0590). Сравнение с sequence-safe B0 (0.2791) смешано
    с high-only vs high+low и не интерпретируется как чистый эффект split.
    Отчёт: `results/OFFICIAL_FOLD_CONTROL.md`.
-2. Подготовка unlabeled smartphone RGB и quality gate — **после** того, как
-   сильный source-детектор пройдёт порог AP50 ≥ 0.50 и pore recall ≥ 0.25.
-   Пока SSDLite B0 не видит поры, адаптация к телефону не запускается.
-   Команда: `train-yolo` / `configs/lohi_yolo_s.yaml` (AGPL, только диссертация).
-3. Адаптация `configs/lohi_to_mobile.yaml` от замороженного B0 student:
-   EMA teacher, калибровка, quality-conditioned pseudo-labels.
-4. Для полного кадра смартфона — двухступенчатая схема
-   `full frame → weld ROI → tight crop → detector`, а не глобальный letterbox.
+2. Сбор unlabeled / частично размеченного smartphone RGB и разметка quality
+   gate. Адаптация стартует от YOLOv8s `student_best.pt`, не от SSDLite B0 и
+   не от `lohi_to_mobile.yaml` с letterbox.
+3. Для полного кадра смартфона — двухступенчатая схема
+   `full frame → weld ROI → tight crop → detector`.

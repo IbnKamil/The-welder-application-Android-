@@ -255,8 +255,10 @@ weldvision evaluate-yolo \
 
 YOLOv8s (Ultralytics) лицензирован как AGPL-3.0: только диссертационное
 сравнение, не Google Play. Лицензионно чистый запасной путь —
-`configs/lohi_fasterrcnn_s0.yaml`. Порог перехода к RGB: macro AP50 ≥ 0.50 и
-recall пор ≥ 0.25. Ячейки Colab: [`COLAB_STRONG_SOURCE.md`](COLAB_STRONG_SOURCE.md).
+`configs/lohi_fasterrcnn_s0.yaml`. Порог перехода к RGB выполнен:
+[`results/YOLOV8S_SEQUENCE_SAFE.md`](results/YOLOV8S_SEQUENCE_SAFE.md)
+(AP50 0.571, pore recall 0.493). Ячейки Colab:
+[`COLAB_STRONG_SOURCE.md`](COLAB_STRONG_SOURCE.md).
 
 Конфигурация B1 сохраняется только как отрицательный комбинированный контроль,
 а не как улучшенный детектор:
