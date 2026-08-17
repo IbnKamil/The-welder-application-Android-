@@ -249,12 +249,19 @@ weldvision train \
   --device cuda
 ```
 
-Для контроля влияния способа разбиения та же B1-конфигурация запускается на
-опубликованном fold 0:
+Для контроля влияния способа разбиения используйте рецепт **B0** на
+опубликованном fold 0. Старый `lohi_official_control.yaml` повторяет B1 и
+смешивает split с letterbox/cosine/balancing.
 
 ```bash
 weldvision train \
-  --config configs/lohi_official_control.yaml \
+  --config configs/lohi_official_b0.yaml \
+  --device cuda
+
+weldvision evaluate \
+  --config configs/lohi_official_b0.yaml \
+  --checkpoint outputs/lohi_official_b0/student_final.pt \
+  --split source_test \
   --device cuda
 ```
 
