@@ -33,13 +33,13 @@ python -m weldvision.cli generate-ablations \
 
 Generated experiments:
 
-| ID | The only changed factor relative to B0 |
-|---|---|
-| A1 | letterbox |
-| A2 | best checkpoint selection |
-| A3 | cosine scheduler |
-| A4 | class-balanced sampler |
-| A5 | photometric augmentation |
+| ID | The only changed factor relative to B0 | Status |
+|---|---|---|
+| A1 | letterbox | rejected (AP50 0.1156) |
+| A2 | best checkpoint selection | no test AP gain (AP50 0.2802) |
+| A3 | cosine scheduler | next |
+| A4 | class-balanced sampler | pending |
+| A5 | photometric augmentation | pending |
 
 Run one experiment at a time. All use the same sequence-safe train/validation/test
 and seed. After screening, promising factors must be repeated with multiple seeds.
