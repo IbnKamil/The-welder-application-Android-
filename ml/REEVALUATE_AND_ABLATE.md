@@ -37,8 +37,8 @@ Generated experiments:
 |---|---|---|
 | A1 | letterbox | rejected (AP50 0.1156) |
 | A2 | best checkpoint selection | no test AP gain (AP50 0.2802) |
-| A3 | cosine scheduler | next |
-| A4 | class-balanced sampler | pending |
+| A3 | cosine scheduler | no clear gain (AP50 0.2862, recall down) |
+| A4 | class-balanced sampler | next |
 | A5 | photometric augmentation | pending |
 
 Run one experiment at a time. All use the same sequence-safe train/validation/test
