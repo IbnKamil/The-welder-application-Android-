@@ -29,6 +29,9 @@ export = [
 data = [
     "gdown>=6.1",
 ]
+research = [
+    "ultralytics>=8.3",
+]
 
 [project.scripts]
 weldvision = "weldvision.cli:main"

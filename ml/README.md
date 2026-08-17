@@ -61,7 +61,7 @@ git clone \
   --branch cursor/welder-pro-app-33b3 \
   https://github.com/IbnKamil/The-welder-application-Android-.git
 cd The-welder-application-Android-/ml
-pip install -e ".[dev,export]"
+pip install -e ".[dev,export,data,research]"
 ```
 
 Проверка:
@@ -239,6 +239,24 @@ weldvision evaluate \
 улучшает AP50 и recall50. Объединённый B1 хуже B0; letterbox (A1) — основной
 отрицательный фактор. Source baseline заморожен как B0, итог в
 [`results/ABLATION_SUMMARY.md`](results/ABLATION_SUMMARY.md).
+
+SSDLite B0 не видит класс `pore` (recall ≈ 0.06). Перед адаптацией к смартфону
+нужен более сильный source-детектор на **том же** sequence-safe split:
+
+```bash
+pip install -e ".[research]"
+weldvision train-yolo --config configs/lohi_yolo_s.yaml --device 0
+weldvision evaluate-yolo \
+  --config configs/lohi_yolo_s.yaml \
+  --checkpoint outputs/lohi_yolo_s/student_best.pt \
+  --split source_test \
+  --device 0
+```
+
+YOLOv8s (Ultralytics) лицензирован как AGPL-3.0: только диссертационное
+сравнение, не Google Play. Лицензионно чистый запасной путь —
+`configs/lohi_fasterrcnn_s0.yaml`. Порог перехода к RGB: macro AP50 ≥ 0.50 и
+recall пор ≥ 0.25. Ячейки Colab: [`COLAB_STRONG_SOURCE.md`](COLAB_STRONG_SOURCE.md).
 
 Конфигурация B1 сохраняется только как отрицательный комбинированный контроль,
 а не как улучшенный детектор:

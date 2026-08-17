@@ -79,6 +79,27 @@ def main() -> None:
     export_parser.add_argument("--checkpoint", required=True)
     export_parser.add_argument("--output", required=True)
 
+    train_yolo_parser = subparsers.add_parser(
+        "train-yolo",
+        help="Train research-only Ultralytics YOLO on the frozen B0 split",
+    )
+    train_yolo_parser.add_argument("--config", required=True)
+    train_yolo_parser.add_argument("--device")
+    train_yolo_parser.add_argument("--resume")
+
+    evaluate_yolo_parser = subparsers.add_parser(
+        "evaluate-yolo",
+        help="Evaluate a YOLO checkpoint with the SSDLite B0 metrics",
+    )
+    evaluate_yolo_parser.add_argument("--config", required=True)
+    evaluate_yolo_parser.add_argument("--checkpoint", required=True)
+    evaluate_yolo_parser.add_argument(
+        "--split",
+        choices=["source_val", "source_test", "val", "test"],
+        default="source_test",
+    )
+    evaluate_yolo_parser.add_argument("--device")
+
     ablation_parser = subparsers.add_parser(
         "generate-ablations",
         help="Generate one-factor B0 ablation configs",
@@ -146,6 +167,25 @@ def main() -> None:
             args.results_root,
         )
         print("\n".join(str(path) for path in paths))
+    elif args.command == "train-yolo":
+        from weldvision.yolo_source import train_yolo_source
+
+        path = train_yolo_source(
+            load_config(args.config),
+            device_name=args.device,
+            resume=args.resume,
+        )
+        print(path)
+    elif args.command == "evaluate-yolo":
+        from weldvision.yolo_source import evaluate_yolo_source
+
+        report = evaluate_yolo_source(
+            load_config(args.config),
+            args.checkpoint,
+            split=args.split,
+            device_name=args.device,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
 
 
 def _split(manifest_path: str, output_path: str, seed: int) -> None:

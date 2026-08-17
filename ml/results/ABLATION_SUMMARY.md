@@ -40,7 +40,10 @@ A4 — единственный прирост recall `pore` (0.0559 → 0.0748)
    0.1635) лучше B1 (0.0590). Сравнение с sequence-safe B0 (0.2791) смешано
    с high-only vs high+low и не интерпретируется как чистый эффект split.
    Отчёт: `results/OFFICIAL_FOLD_CONTROL.md`.
-2. Подготовка unlabeled smartphone RGB и quality gate.
+2. Подготовка unlabeled smartphone RGB и quality gate — **после** того, как
+   сильный source-детектор пройдёт порог AP50 ≥ 0.50 и pore recall ≥ 0.25.
+   Пока SSDLite B0 не видит поры, адаптация к телефону не запускается.
+   Команда: `train-yolo` / `configs/lohi_yolo_s.yaml` (AGPL, только диссертация).
 3. Адаптация `configs/lohi_to_mobile.yaml` от замороженного B0 student:
    EMA teacher, калибровка, quality-conditioned pseudo-labels.
 4. Для полного кадра смартфона — двухступенчатая схема

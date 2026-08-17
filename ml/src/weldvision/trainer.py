@@ -23,15 +23,25 @@ from weldvision.data import (
 )
 from weldvision.metrics import detection_calibration_pairs, evaluate_detections
 from weldvision.model import (
+    architecture_from_config,
+    create_detector,
     create_ema_teacher,
-    create_mobile_detector,
-    mobile_model_spec,
+    detector_spec,
     move_targets,
     update_ema_teacher,
 )
 from weldvision.pseudo import ScoreTemperature, select_pseudo_targets
 from weldvision.quality import QualityGate, quality_scores
 from weldvision.quality_training import load_quality_gate
+
+
+def _model_spec(config: ExperimentConfig) -> dict[str, Any]:
+    pretrained = bool(config.raw.get("model", {}).get("pretrained_backbone", True))
+    return detector_spec(
+        architecture_from_config(config.raw),
+        config.data.image_size,
+        pretrained,
+    )
 
 
 def seed_everything(seed: int) -> None:
@@ -181,8 +191,12 @@ def run_training(
         num_workers=config.training.workers,
         collate_fn=detection_collate,
     )
-    student = create_mobile_detector(
+    student = create_detector(
+        architecture_from_config(config.raw),
         len(config.data.class_names),
+        pretrained_backbone=bool(
+            config.raw.get("model", {}).get("pretrained_backbone", True)
+        ),
         image_size=config.data.image_size,
     ).to(device)
     teacher = create_ema_teacher(student).to(device)
@@ -274,7 +288,7 @@ def run_training(
                 "model": student.state_dict(),
                 "class_names": config.data.class_names,
                 "config": config.raw,
-                "model_spec": mobile_model_spec(config.data.image_size),
+                "model_spec": _model_spec(config),
             },
             final_path,
         )
@@ -331,7 +345,7 @@ def run_training(
             "model": student.state_dict(),
             "class_names": config.data.class_names,
             "config": config.raw,
-            "model_spec": mobile_model_spec(config.data.image_size),
+            "model_spec": _model_spec(config),
         },
         final_path,
     )
@@ -361,7 +375,7 @@ def _save_checkpoint(
             "scheduler": scheduler.state_dict(),
             "best_validation_ap": best_validation_ap,
             "config": config.raw,
-            "model_spec": mobile_model_spec(config.data.image_size),
+            "model_spec": _model_spec(config),
         },
         output_dir / "last.pt",
     )
@@ -419,7 +433,7 @@ def _save_best_model(
             "model": student.state_dict(),
             "class_names": config.data.class_names,
             "config": config.raw,
-            "model_spec": mobile_model_spec(config.data.image_size),
+            "model_spec": _model_spec(config),
             "epoch": epoch,
             **validation,
         },

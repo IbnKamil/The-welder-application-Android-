@@ -19,7 +19,8 @@ from weldvision.metrics import (
     evaluate_detections,
     expected_calibration_error,
 )
-from weldvision.model import create_mobile_detector, restore_mobile_detector
+from weldvision.model import create_faster_rcnn, create_mobile_detector, restore_mobile_detector
+from weldvision.yolo_source import stage_ultralytics_dataset
 from weldvision.pseudo import ScoreTemperature, select_pseudo_targets
 from weldvision.quality import heuristic_quality
 
@@ -197,3 +198,87 @@ def test_ablation_generator_changes_one_named_factor(tmp_path: Path) -> None:
     assert loaded.data.source_train == (
         Path(__file__).parents[1] / "data/manifests/source_train.txt"
     )
+
+
+def test_faster_rcnn_restore_roundtrip() -> None:
+    model = create_faster_rcnn(4, pretrained_backbone=False, image_size=320)
+    images = [torch.rand(3, 320, 320)]
+    targets = [
+        {
+            "boxes": torch.tensor([[30.0, 40.0, 120.0, 150.0]]),
+            "labels": torch.tensor([1]),
+        }
+    ]
+    model.train()
+    losses = model(images, targets)
+    assert losses
+    restored = restore_mobile_detector(
+        {
+            "model": model.state_dict(),
+            "model_spec": {
+                "architecture": "fasterrcnn_resnet50_fpn",
+                "image_size": 320,
+                "pretrained_backbone": False,
+            },
+        },
+        defect_class_count=4,
+        image_size=320,
+    )
+    assert restored.state_dict().keys() == model.state_dict().keys()
+
+
+def test_yolo_dataset_staging_reuses_sidecar_labels(tmp_path: Path) -> None:
+    image_dir = tmp_path / "high_resolution_welds"
+    image_dir.mkdir()
+    image_path = image_dir / "weld_01.jpg"
+    Image.new("RGB", (64, 32), "gray").save(image_path)
+    (image_dir / "weld_01.yolo").write_text("0 0.5 0.5 0.2 0.4\n", encoding="utf-8")
+    for name in ("source_train.txt", "source_val.txt", "source_test.txt"):
+        (tmp_path / name).write_text(f"{image_path}\n", encoding="utf-8")
+    config_path = tmp_path / "cfg.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "experiment": {"name": "stage", "seed": 42, "output_dir": str(tmp_path / "out")},
+                "project_root": str(tmp_path),
+                "data": {
+                    "source_train": "source_train.txt",
+                    "source_val": "source_val.txt",
+                    "source_test": "source_test.txt",
+                    "target_unlabeled": "source_train.txt",
+                    "target_val": "source_val.txt",
+                    "target_test": "source_test.txt",
+                    "class_names": ["pore", "deposit", "discontinuity", "stain"],
+                    "image_size": 640,
+                    "letterbox": False,
+                    "group_manifest": "source_train.txt",
+                },
+                "training": {
+                    "source_epochs": 1,
+                    "adaptation_epochs": 0,
+                    "batch_size": 2,
+                    "workers": 0,
+                    "learning_rate": 0.001,
+                    "weight_decay": 0.0001,
+                    "unsupervised_weight": 0.0,
+                    "ema_decay": 0.999,
+                    "pseudo_threshold": 0.65,
+                    "quality_threshold_strength": 0.25,
+                    "checkpoint_every": 1,
+                    "balanced_sampling": False,
+                    "photometric_augmentation": False,
+                    "validation_every": 1,
+                    "scheduler_eta_min": 1e-6,
+                    "scheduler": "constant",
+                    "select_best_checkpoint": False,
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    staged = stage_ultralytics_dataset(load_config(config_path), tmp_path / "yolo_ds")
+    label = tmp_path / "yolo_ds/train/labels/high_resolution_welds__weld_01.txt"
+    assert staged.is_file()
+    assert label.read_text(encoding="utf-8") == "0 0.5 0.5 0.2 0.4\n"
+
