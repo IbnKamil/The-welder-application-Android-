@@ -1,0 +1,62 @@
+experiment:
+  name: lohi_fasterrcnn_s0
+  seed: 42
+  output_dir: outputs/lohi_fasterrcnn_s0
+
+# License-clean stronger source detector (torchvision Faster R-CNN, BSD).
+# Same sequence-safe manifests as frozen SSDLite B0. Heavier than YOLO on Colab.
+
+data:
+  source_train: data/manifests/source_train.txt
+  source_val: data/manifests/source_val.txt
+  source_test: data/manifests/source_test.txt
+  target_unlabeled: data/manifests/target_unlabeled.txt
+  target_val: data/manifests/target_val.txt
+  target_test: data/manifests/target_test.txt
+  class_names:
+    - pore
+    - deposit
+    - discontinuity
+    - stain
+  image_size: 640
+  letterbox: false
+  group_manifest: data/manifests/groups.csv
+
+model:
+  student: fasterrcnn_resnet50_fpn
+  pretrained_backbone: true
+
+training:
+  source_epochs: 50
+  adaptation_epochs: 0
+  batch_size: 2
+  workers: 2
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  unsupervised_weight: 0.0
+  ema_decay: 0.999
+  pseudo_threshold: 0.65
+  quality_threshold_strength: 0.25
+  checkpoint_every: 1
+  balanced_sampling: false
+  photometric_augmentation: false
+  validation_every: 5
+  scheduler_eta_min: 0.000001
+  scheduler: constant
+  select_best_checkpoint: false
+
+calibration:
+  initial_temperature: 1.0
+  target_coverage: 0.85
+
+evaluation:
+  iou_thresholds: [0.5, 0.75]
+  confidence_threshold: 0.25
+  ap_confidence_floor: 0.001
+  bootstrap_samples: 1000
+  random_seeds: [17, 42, 73]
+
+export:
+  format: onnx
+  opset: 18
+  quantization: int8

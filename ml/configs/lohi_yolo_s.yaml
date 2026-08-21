@@ -1,0 +1,52 @@
+experiment:
+  name: lohi_yolo_s_sequence_safe
+  seed: 42
+  output_dir: outputs/lohi_yolo_s
+
+# Research-only. Ultralytics YOLO is AGPL-3.0. Do not ship these weights
+# in the Play Store app. Compare against frozen SSDLite B0 on the same split.
+
+data:
+  source_train: data/manifests/source_train.txt
+  source_val: data/manifests/source_val.txt
+  source_test: data/manifests/source_test.txt
+  target_unlabeled: data/manifests/target_unlabeled.txt
+  target_val: data/manifests/target_val.txt
+  target_test: data/manifests/target_test.txt
+  class_names:
+    - pore
+    - deposit
+    - discontinuity
+    - stain
+  image_size: 640
+  letterbox: false
+  group_manifest: data/manifests/groups.csv
+
+model:
+  student: yolov8s
+  yolo_weights: yolov8s.pt
+  pretrained_backbone: true
+
+training:
+  source_epochs: 50
+  adaptation_epochs: 0
+  batch_size: 16
+  workers: 2
+  learning_rate: 0.01
+  weight_decay: 0.0005
+  unsupervised_weight: 0.0
+  ema_decay: 0.999
+  pseudo_threshold: 0.65
+  quality_threshold_strength: 0.25
+  checkpoint_every: 1
+  balanced_sampling: false
+  photometric_augmentation: false
+  validation_every: 1
+  scheduler_eta_min: 0.000001
+  scheduler: cosine
+  select_best_checkpoint: true
+
+evaluation:
+  iou_thresholds: [0.5, 0.75]
+  confidence_threshold: 0.25
+  ap_confidence_floor: 0.001
