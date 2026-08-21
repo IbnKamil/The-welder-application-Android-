@@ -70,7 +70,7 @@ python -m weldvision.cli explain-network --output outputs/network_tour
 python -m weldvision.cli explain-network \
   --output outputs/network_tour \
   --checkpoint outputs/lohi_yolo_s/student_best.pt \
-  --image path/to/weld.jpg \
+  --image path/to/demo_weld.jpg \
   --device 0
 ```
 

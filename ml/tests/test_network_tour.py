@@ -16,7 +16,7 @@ from weldvision.network_tour import (
 def test_demo_weld_is_rgb_and_has_bead() -> None:
     image = make_demo_weld_image()
     assert image.mode == "RGB"
-    assert image.size == (640, 240)
+    assert image.size[1] > image.size[0]
     array = np.asarray(image)
     assert array[array.shape[0] // 2, array.shape[1] // 2].sum() > 0
 
@@ -47,6 +47,17 @@ def test_tensor_grid_has_expected_layout() -> None:
     assert grid.width > 0 and grid.height > 0
 
 
+def test_write_network_tour_uses_provided_image(tmp_path: Path) -> None:
+    photo = tmp_path / "weld.jpg"
+    make_demo_weld_image((200, 320)).save(photo)
+    write_network_tour(tmp_path / "tour", image_path=photo)
+    saved = tmp_path / "tour" / "figures" / "00_input.png"
+    assert saved.is_file()
+    from PIL import Image
+
+    assert Image.open(saved).size == (200, 320)
+
+
 def test_write_network_tour_without_checkpoint(tmp_path: Path) -> None:
     report = write_network_tour(tmp_path / "tour")
     assert report.is_file()
@@ -54,8 +65,8 @@ def test_write_network_tour_without_checkpoint(tmp_path: Path) -> None:
     assert "Визуальный разбор нейронной сети" in html
     assert "Letterbox" in html
     figures = tmp_path / "tour" / "figures"
+    assert (figures / "00_demo_input.png").is_file() or (figures / "00_input.png").is_file()
     for name in (
-        "00_demo_input.png",
         "01_letterbox.png",
         "02_rgb_channels.png",
         "03_pixel_numbers.png",

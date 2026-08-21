@@ -40,29 +40,65 @@ class TourStage:
     extra: dict[str, Any]
 
 
-def make_demo_weld_image(size: tuple[int, int] = (640, 240)) -> Image.Image:
-    """Synthetic weld strip so the tour runs without LoHi files."""
+DEMO_WELD_PATH = Path(__file__).resolve().parents[2] / "assets" / "demo_weld.jpg"
+
+
+def _fractal_noise(
+    height: int,
+    width: int,
+    rng: np.random.Generator,
+    octaves: tuple[tuple[int, float], ...] = ((12, 1.0), (5, 0.45), (2, 0.2)),
+) -> np.ndarray:
+    acc = np.zeros((height, width), dtype=np.float32)
+    for scale, amplitude in octaves:
+        small_h = max(2, height // scale)
+        small_w = max(2, width // scale)
+        tile = rng.random((small_h, small_w)).astype(np.float32)
+        resized = np.asarray(
+            Image.fromarray((tile * 255).astype(np.uint8)).resize((width, height), Image.Resampling.BILINEAR),
+            dtype=np.float32,
+        ) / 255.0
+        acc += amplitude * resized
+    acc -= acc.min()
+    return acc / (acc.max() + 1e-6)
+
+
+def make_demo_weld_image(size: tuple[int, int] = (420, 640)) -> Image.Image:
+    """Portrait RGB weld with a centerline of surface pores (tour default)."""
     width, height = size
-    image = Image.new("RGB", (width, height), (28, 28, 30))
-    draw = ImageDraw.Draw(image)
-    bead_top = height // 3
-    bead_bottom = (2 * height) // 3
-    draw.rectangle((0, bead_top, width, bead_bottom), fill=(96, 96, 102))
-    for index in range(8):
-        x = 40 + index * (width // 8)
-        draw.arc(
-            (x, bead_top + 4, x + 70, bead_bottom - 4),
-            start=200,
-            end=340,
-            fill=(130, 130, 136),
-            width=3,
-        )
-    draw.ellipse((90, height // 2 - 6, 102, height // 2 + 6), fill=(20, 20, 20))
-    draw.ellipse((108, height // 2 - 4, 116, height // 2 + 4), fill=(18, 18, 18))
-    draw.polygon(((300, bead_top + 8), (340, bead_top - 6), (360, bead_bottom - 10)), fill=(160, 160, 168))
-    draw.rectangle((470, bead_top + 12, 560, bead_bottom - 12), fill=(58, 58, 62))
-    draw.ellipse((200, bead_top + 10, 248, bead_bottom - 8), fill=(150, 140, 90))
-    return image
+    rng = np.random.default_rng(21)
+    rows, cols = np.mgrid[0:height, 0:width]
+    grain = _fractal_noise(height, width, rng)
+    plate = 22 + 28 * grain + 8 * _fractal_noise(height, width, rng, ((3, 1.0), (1, 0.35)))
+    center = width * 0.50
+    half = width * 0.16
+    wave = 7 * np.sin(rows / 38.0) + 4 * np.sin(rows / 11.0)
+    dist = np.abs(cols - center - wave)
+    profile = np.clip(1.0 - (dist / half) ** 2, 0.0, 1.0)
+    scales = 0.55 + 0.45 * np.clip(np.sin(rows / 9.5 + 0.4 * np.sin(cols / 18.0)), -0.2, 1.0)
+    light = 0.78 + 0.28 * (1.0 - rows / height) - 0.12 * ((cols - center) / width)
+    metal = 78 + 95 * profile * scales * light + 18 * grain
+    rust = np.clip((cols - center) / max(half, 1), 0, 1) * profile
+    red = np.clip(plate * (1 - profile) + metal * profile + 55 * rust, 0, 255)
+    green = np.clip(plate * (1 - profile) + metal * profile * 0.92 + 12 * rust, 0, 255)
+    blue = np.clip(plate * (1 - profile) + metal * profile * 0.88 - 8 * rust, 0, 255)
+    rgb = np.stack((red, green, blue), axis=-1)
+    pore_ys = np.linspace(height * 0.10, height * 0.90, 9)
+    for index, py in enumerate(pore_ys):
+        px = center + 2.5 * np.sin(index * 0.9)
+        radius = 3.4 + (index % 3) * 1.3
+        mask = (cols - px) ** 2 / (radius * 1.05) ** 2 + (rows - py) ** 2 / radius**2 <= 1.0
+        rim = (cols - px) ** 2 / (radius * 1.35) ** 2 + (rows - py) ** 2 / (radius * 1.25) ** 2 <= 1.0
+        rgb[rim] = rgb[rim] * 0.55 + np.array([30, 28, 26])
+        rgb[mask] = np.array([16, 14, 12], dtype=np.float32)
+    return Image.fromarray(np.clip(rgb, 0, 255).astype(np.uint8), mode="RGB")
+
+
+def default_demo_image() -> Image.Image:
+    """Prefer a user photo in ml/assets/demo_weld.jpg, else the generated bead."""
+    if DEMO_WELD_PATH.is_file():
+        return Image.open(DEMO_WELD_PATH).convert("RGB")
+    return make_demo_weld_image()
 
 
 def letterbox(image: Image.Image, size: int = 640, fill: int = 114) -> tuple[Image.Image, float, tuple[int, int]]:
@@ -200,8 +236,8 @@ def write_network_tour(
     output = Path(output_directory).expanduser().resolve()
     figures = output / "figures"
     figures.mkdir(parents=True, exist_ok=True)
-    source = Image.open(image_path).convert("RGB") if image_path else make_demo_weld_image()
-    source_name = "00_demo_input.png" if image_path is None else "00_input.png"
+    source = Image.open(image_path).convert("RGB") if image_path else default_demo_image()
+    source_name = "00_input.png" if image_path or DEMO_WELD_PATH.is_file() else "00_demo_input.png"
     source.save(figures / source_name)
 
     boxed, scale, pad = letterbox(source, image_size)
@@ -221,7 +257,8 @@ def write_network_tour(
             "1. Входное изображение",
             "Сеть не видит «шов» словами. Для неё это таблица чисел: высота × ширина × 3 цвета (R, G, B), "
             "каждое значение 0…255. Чем больше пикселей занимает пора, тем легче её найти. "
-            "Если checkpoint не задан, ниже показан синтетический валик — тот же пайплайн, что и для кадра LoHi.",
+            "Демонстрационный кадр: вертикальный валик RGB с цепочкой поверхностных пор по оси шва. "
+            "Для сети это те же числа H×W×3, что и для кадра LoHi или смартфона.",
             source_name,
             {"shape": f"{source.size[1]}×{source.size[0]}×3", "dtype": "uint8 RGB"},
         ),

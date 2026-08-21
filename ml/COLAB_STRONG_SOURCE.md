@@ -111,5 +111,5 @@ Faster R-CNN ResNet50-FPN, тот же split, `weldvision train` (не train-yol
   --device 0
 ```
 
-Скачайте папку `network_tour` и откройте `index.html`. Без checkpoint команда
-всё равно соберёт учебные схемы на синтетическом шве.
+Скачайте папку `network_tour` и откройте `index.html`. Демонстрационный кадр
+загружается ячейкой в [`COLAB_NETWORK_TOUR.md`](COLAB_NETWORK_TOUR.md).

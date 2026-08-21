@@ -12,6 +12,9 @@ __pycache__/
 *.py[cod]
 ml/data/
 ml/outputs/
+ml/assets/demo_weld.jpg
+ml/assets/demo_weld.jpeg
+ml/assets/demo_weld.png
 ml/**/*.egg-info/
 ml/**/*.pt
 ml/**/*.onnx

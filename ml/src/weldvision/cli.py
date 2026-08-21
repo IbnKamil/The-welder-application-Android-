@@ -115,7 +115,7 @@ def main() -> None:
     explain_parser.add_argument("--output", required=True)
     explain_parser.add_argument(
         "--image",
-        help="Optional weld photo. If omitted, a synthetic bead is generated.",
+        help="Weld photo for the tour. Default: ml/assets/demo_weld.jpg or a generated bead.",
     )
     explain_parser.add_argument(
         "--checkpoint",

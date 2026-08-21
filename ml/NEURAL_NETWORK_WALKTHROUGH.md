@@ -15,7 +15,7 @@ python -m weldvision.cli explain-network --output outputs/network_tour
 python -m weldvision.cli explain-network \
   --output outputs/network_tour \
   --checkpoint /content/drive/MyDrive/SvarshikProAI/lohi_yolo_s/student_best.pt \
-  --image path/to/weld.jpg \
+  --image /content/drive/MyDrive/SvarshikProAI/demo_weld.jpg \
   --device 0
 ```
 
