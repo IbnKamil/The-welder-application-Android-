@@ -89,6 +89,9 @@ cd The-welder-application-Android-/ml
 pip install -e ".[dev,export,data,research]"
 ```
 
+Новая сессия только для разбора сети (без обучения):
+[`COLAB_NETWORK_TOUR.md`](COLAB_NETWORK_TOUR.md).
+
 Проверка:
 
 ```bash

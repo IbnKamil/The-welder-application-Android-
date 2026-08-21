@@ -15,6 +15,20 @@ YOLOv8s — **только для диссертации** (лицензия AGP
 
 ## 1. Код и зависимость
 
+Новая сессия Colab (репозитория ещё нет):
+
+```python
+from google.colab import drive
+drive.mount("/content/drive")
+%cd /content
+!git clone --branch cursor/welder-pro-app-33b3 \
+  https://github.com/IbnKamil/The-welder-application-Android-.git
+%cd The-welder-application-Android-/ml
+%pip install -q -e ".[data,research]"
+```
+
+Если папка `/content/The-welder-application-Android-` уже есть:
+
 ```python
 %cd /content/The-welder-application-Android-
 !git pull origin cursor/welder-pro-app-33b3
