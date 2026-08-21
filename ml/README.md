@@ -51,6 +51,31 @@ teacher и оценки качества снимка. Это проверяем
 - AP, precision, recall, FP/image, ECE, risk-coverage и bootstrap CI;
 - checkpoint/resume, JSONL-журнал эксперимента;
 - FP32 ONNX export после валидации.
+- HTML-разбор прямого прохода YOLOv8s (`weldvision explain-network`).
+
+## Как устроена нейронная сеть
+
+Пошаговая теория с диаграммами:
+[`NEURAL_NETWORK_WALKTHROUGH.md`](NEURAL_NETWORK_WALKTHROUGH.md).
+
+Сгенерировать визуальный отчёт (откройте `index.html`):
+
+```bash
+python -m weldvision.cli explain-network --output outputs/network_tour
+```
+
+С живыми картами признаков обученного YOLOv8s:
+
+```bash
+python -m weldvision.cli explain-network \
+  --output outputs/network_tour \
+  --checkpoint outputs/lohi_yolo_s/student_best.pt \
+  --image path/to/weld.jpg \
+  --device 0
+```
+
+Без checkpoint отчёт всё равно показывает вход как числа, letterbox,
+одну свёртку, пирамиду P3/P4/P5, голову Detect, NMS и отличие обучения от вывода.
 
 ## Установка
 

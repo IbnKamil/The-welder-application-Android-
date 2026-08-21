@@ -108,6 +108,23 @@ def main() -> None:
     ablation_parser.add_argument("--output", required=True)
     ablation_parser.add_argument("--results-root", required=True)
 
+    explain_parser = subparsers.add_parser(
+        "explain-network",
+        help="Write an HTML walkthrough of each YOLOv8s inference step",
+    )
+    explain_parser.add_argument("--output", required=True)
+    explain_parser.add_argument(
+        "--image",
+        help="Optional weld photo. If omitted, a synthetic bead is generated.",
+    )
+    explain_parser.add_argument(
+        "--checkpoint",
+        help="Optional YOLOv8s weights (student_best.pt) for live activation maps",
+    )
+    explain_parser.add_argument("--device")
+    explain_parser.add_argument("--image-size", type=int, default=640)
+    explain_parser.add_argument("--confidence", type=float, default=0.25)
+
     args = parser.parse_args()
     if args.command == "split":
         _split(args.manifest, args.output, args.seed)
@@ -186,6 +203,18 @@ def main() -> None:
             device_name=args.device,
         )
         print(json.dumps(report, ensure_ascii=False, indent=2))
+    elif args.command == "explain-network":
+        from weldvision.network_tour import write_network_tour
+
+        path = write_network_tour(
+            args.output,
+            image_path=args.image,
+            checkpoint=args.checkpoint,
+            device_name=args.device,
+            image_size=args.image_size,
+            confidence=args.confidence,
+        )
+        print(path)
 
 
 def _split(manifest_path: str, output_path: str, seed: int) -> None:

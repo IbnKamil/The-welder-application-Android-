@@ -85,3 +85,17 @@ Faster R-CNN ResNet50-FPN, тот же split, `weldvision train` (не train-yol
   --config configs/lohi_fasterrcnn_s0.yaml \
   --device cuda
 ```
+
+## Разбор нейронной сети по шагам
+
+Теория: `NEURAL_NETWORK_WALKTHROUGH.md`. Картинки прямого прохода:
+
+```python
+!python -m weldvision.cli explain-network \
+  --output /content/drive/MyDrive/SvarshikProAI/network_tour \
+  --checkpoint /content/drive/MyDrive/SvarshikProAI/lohi_yolo_s/student_best.pt \
+  --device 0
+```
+
+Скачайте папку `network_tour` и откройте `index.html`. Без checkpoint команда
+всё равно соберёт учебные схемы на синтетическом шве.
